@@ -7,3 +7,9 @@ export enum ProjectRole {
   MEMBER = 'member',
   ADMIN = 'admin',
 }
+
+export interface AuthenticatedRequest extends Request {
+  user: {
+    _id: string;
+  };
+}

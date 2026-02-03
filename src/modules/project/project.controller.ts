@@ -1,12 +1,7 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Param, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { ProjectService } from './project.service';
-
-interface AuthenticatedRequest extends Request {
-  user: {
-    _id: string;
-  };
-}
+import type { AuthenticatedRequest } from './type/project.types';
 
 @Controller('projects')
 export class ProjectController {
@@ -18,5 +13,19 @@ export class ProjectController {
     const userId = process.env.MY_USER;
 
     return this.projectService.getAllProjects(userId);
+  }
+
+  @Get(':id')
+  async getProjectById(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') projectId: string,
+    // @Headers('x-user-id') userId: string,
+  ) {
+    // const userId = req.user._id;
+    const userId = process.env.MY_USER;
+    return {
+      success: true,
+      result: await this.projectService.getProjectById(userId, projectId),
+    };
   }
 }

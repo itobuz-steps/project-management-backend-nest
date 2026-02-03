@@ -1,7 +1,7 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectConnection, MongooseModule } from '@nestjs/mongoose';
-import { Connection } from 'mongoose';
+import { Connection, ConnectionStates } from 'mongoose';
 import { AppConfig } from 'src/config/app.config';
 
 @Module({
@@ -19,7 +19,7 @@ export class DatabaseModule implements OnModuleInit {
   constructor(@InjectConnection() private readonly connection: Connection) {}
 
   onModuleInit() {
-    if (this.connection.readyState === 1) {
+    if (this.connection.readyState === ConnectionStates.connected) {
       console.log('MongoDB connected');
     } else {
       this.connection.once('connected', () => {
@@ -28,7 +28,7 @@ export class DatabaseModule implements OnModuleInit {
     }
 
     this.connection.on('error', (error) => {
-      console.log(`MongoDB connection error: ${error.message}`);
+      console.log(`MongoDB connection error: ${error}`);
     });
   }
 }

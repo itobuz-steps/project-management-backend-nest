@@ -10,11 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { AuthService } from '../modules/auth/auth.service';
 import type { AppConfig } from '../config/app.config';
-
-interface JwtPayload {
-  userId: string;
-  email: string;
-}
+import type JwtPayload from '../modules/auth/types/auth.types';
 
 @Injectable()
 export class IsAuthenticated implements CanActivate {

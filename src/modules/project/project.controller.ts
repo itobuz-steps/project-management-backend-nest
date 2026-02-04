@@ -15,6 +15,19 @@ export class ProjectController {
     return this.projectService.getAllProjects(userId);
   }
 
+  // GET /projects/user-projects
+  @Get('user-projects')
+  async getProjectsByUserId(
+    @Req() req: AuthenticatedRequest,
+    // @Headers('x-user-id') userId: string,
+  ) {
+    const userId = process.env.MY_USER;
+    return {
+      success: true,
+      result: await this.projectService.getProjectsByUserId(userId),
+    };
+  }
+
   @Get(':id')
   async getProjectById(
     @Req() req: AuthenticatedRequest,
@@ -26,6 +39,18 @@ export class ProjectController {
     return {
       success: true,
       result: await this.projectService.getProjectById(userId, projectId),
+    };
+  }
+
+  @Get('get-user/:id')
+  async getUserByProjectId(@Param('id') projectId: string) {
+    const project = await this.projectService.getUserByProjectId(projectId);
+
+    const users = project.members.map((member) => member.user);
+
+    return {
+      success: true,
+      result: users,
     };
   }
 }

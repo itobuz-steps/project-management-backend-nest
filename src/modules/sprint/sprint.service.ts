@@ -124,34 +124,6 @@ export class SprintService {
     return updatedSprint;
   }
 
-  // async deleteSprint(
-  //   userId: ObjectIdLike,
-  //   sprintId: ObjectIdLike,
-  // ): Promise<Sprint> {
-  //   const sprint = await this.sprintModel.findById(sprintId);
-
-  //   if (!sprint) {
-  //     throw new NotFoundException('Sprint not found');
-  //   }
-
-  //   const project = await this.projectModel.findOne({
-  //     _id: sprint.projectId,
-  //     'members.user': userId,
-  //   });
-
-  //   if (!project) {
-  //     throw new ForbiddenException('Unauthorized');
-  //   }
-
-  //   const deletedSprint = await this.sprintModel.findByIdAndDelete(sprintId);
-
-  //   if (!deletedSprint) {
-  //     throw new NotFoundException('Sprint not found');
-  //   }
-
-  //   return deletedSprint;
-  // }
-
   async deleteSprint(
     userId: ObjectIdLike,
     sprintId: ObjectIdLike,
@@ -174,5 +146,74 @@ export class SprintService {
     }
 
     return sprint;
+  }
+
+  async addTasksIntoSprint(
+    userId: ObjectIdLike,
+    sprintId: ObjectIdLike,
+    tasks: ObjectIdLike[],
+  ): Promise<Sprint> {
+    const sprint = await this.sprintModel.findById(sprintId);
+
+    if (!sprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    const project = await this.projectModel.findOne({
+      _id: sprint.projectId,
+      'members.user': userId,
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    const updatedSprint = await this.sprintModel.findByIdAndUpdate(
+      sprintId,
+      {
+        // prevents duplicates automatically
+        $addToSet: { tasks: { $each: tasks } },
+      },
+      { new: true },
+    );
+
+    if (!updatedSprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    return updatedSprint;
+  }
+
+  async removeTaskFromSprint(
+    userId: ObjectIdLike,
+    sprintId: ObjectIdLike,
+    taskId: ObjectIdLike,
+  ): Promise<Sprint> {
+    const sprint = await this.sprintModel.findById(sprintId);
+
+    if (!sprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    const project = await this.projectModel.findOne({
+      _id: sprint.projectId,
+      'members.user': userId,
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    const updatedSprint = await this.sprintModel.findByIdAndUpdate(
+      sprintId,
+      { $pull: { tasks: taskId } },
+      { new: true },
+    );
+
+    if (!updatedSprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    return updatedSprint;
   }
 }

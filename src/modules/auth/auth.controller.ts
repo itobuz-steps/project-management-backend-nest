@@ -177,10 +177,6 @@ export class AuthController {
         throw new BadRequestException('Email, OTP and password are required');
       }
 
-      if (typeof password !== 'string') {
-        throw new BadRequestException('Password must be a string');
-      }
-
       const hashedPassword = await bcrypt.hash(password, 10);
 
       await this.authService.resetPassword(email, otp, hashedPassword);

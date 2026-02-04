@@ -7,6 +7,7 @@ import { User, UserSchema } from './schemas/user.schema';
 import { Otp, OtpSchema } from './schemas/otp.schema';
 import { MailService } from '../../utils/sendVerificationMail';
 import { TokenGeneratorService } from '../../utils/tokenGenerator';
+import { IsAuthenticated } from '../../middlewares/isAuthenticated';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { TokenGeneratorService } from '../../utils/tokenGenerator';
     JwtModule.register({}),
   ],
   controllers: [AuthController],
-  providers: [AuthService, MailService, TokenGeneratorService],
+  providers: [AuthService, MailService, TokenGeneratorService, IsAuthenticated],
   exports: [AuthService],
 })
 export class AuthModule {}

@@ -8,6 +8,7 @@ import appConfig from './config/app.config';
 import { ProjectModule } from './modules/project/project.module';
 import { MailSender } from './utils/mailSender';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { SprintModule } from './modules/sprint/sprint.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
     ProjectModule,
     AuthModule,
     TasksModule,
+    SprintModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailSender],

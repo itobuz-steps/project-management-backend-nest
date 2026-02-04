@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import appConfig from './config/app.config';
+import { ProjectModule } from './modules/project/project.module';
 import { MailSender } from './utils/mailSender';
 
 @Module({
@@ -14,6 +15,7 @@ import { MailSender } from './utils/mailSender';
       load: [appConfig],
     }),
     DatabaseModule,
+    ProjectModule,
     AuthModule,
   ],
   controllers: [AppController],

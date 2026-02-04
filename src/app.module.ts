@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import appConfig from './config/app.config';
 import { ProjectModule } from './modules/project/project.module';
 import { MailSender } from './utils/mailSender';
+import { SprintModule } from './modules/sprint/sprint.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { MailSender } from './utils/mailSender';
     DatabaseModule,
     ProjectModule,
     AuthModule,
+    SprintModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailSender],

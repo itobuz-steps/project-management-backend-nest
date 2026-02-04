@@ -6,10 +6,10 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Project } from './schema/project.schema';
-import { ObjectIdLike } from './type/project.types';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { generateProjectPrefix } from 'src/utils/project-prefix.util';
+import { ObjectIdLike } from 'src/type/common.type';
 
 @Injectable()
 export class ProjectService {

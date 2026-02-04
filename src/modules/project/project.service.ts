@@ -9,6 +9,7 @@ import { Project } from './schema/project.schema';
 import { ObjectIdLike } from './type/project.types';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 
 @Injectable()
 export class ProjectService {
@@ -61,12 +62,7 @@ export class ProjectService {
     userId: ObjectIdLike,
     dto: CreateProjectDto,
   ): Promise<Project> {
-    const prefix =
-      dto.prefix ??
-      dto.name
-        .split(' ')
-        .map((word) => word[0]?.toUpperCase() || '')
-        .join('');
+    const prefix = dto.prefix ?? generateProjectPrefix(dto.name);
 
     const project = new this.projectModel({
       ...dto,
@@ -83,6 +79,12 @@ export class ProjectService {
     projectId: ObjectIdLike,
     update: UpdateProjectDto,
   ): Promise<Project> {
+    const updatePayload: Record<string, any> = { ...update };
+
+    if (update.name) {
+      updatePayload.prefix = generateProjectPrefix(update.name);
+    }
+
     const project = await this.projectModel.findOneAndUpdate(
       {
         _id: projectId,
@@ -93,7 +95,7 @@ export class ProjectService {
           },
         },
       },
-      { $set: update },
+      updatePayload,
       { new: true },
     );
 

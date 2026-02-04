@@ -108,7 +108,7 @@ export class AuthService {
 
     const otp = await this.otpModel.create({
       userId,
-      value,
+      value: +value,
       expiry: new Date(Date.now() + expiryMinutes * 60 * 1000),
     });
 

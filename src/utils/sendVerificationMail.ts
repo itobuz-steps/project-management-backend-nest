@@ -15,7 +15,7 @@ export class MailService {
   ): Promise<void> {
     try {
       const mailSender = new MailSender(this.configService);
-      const mailResponse = await mailSender.sendMail(
+      await mailSender.sendMail(
         email,
         'Verification Email',
         `
@@ -40,7 +40,7 @@ export class MailService {
       );
 
       this.logger.log(`Verification email sent to ${email}`);
-      return mailResponse;
+      return;
     } catch (error) {
       this.logger.error(`Failed to send verification email to ${email}`, error);
       throw error;
@@ -50,14 +50,14 @@ export class MailService {
   async sendInvitationMail(email: string, token: string): Promise<void> {
     try {
       const mailSender = new MailSender(this.configService);
-      const mailResponse = await mailSender.sendMail(
+      await mailSender.sendMail(
         email,
         'You are invited to be a part of this project',
         `Click to join this project : http://localhost:5173/invite/join?token=${token}`,
       );
 
       this.logger.log(`Invitation email sent to ${email}`);
-      return mailResponse;
+      return;
     } catch (error) {
       this.logger.error(`Failed to send invitation email to ${email}`, error);
       throw error;

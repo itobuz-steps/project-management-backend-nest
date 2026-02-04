@@ -1,5 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { TASK_PRIORITIES, TASK_TYPES } from 'src/constants/task.constants';
+import type { TaskPriority, TaskType } from 'src/constants/task.constants';
 
 @Schema({ timestamps: true })
 export class Task extends Document {
@@ -26,10 +28,10 @@ export class Task extends Document {
 
   @Prop({
     type: String,
-    enum: ['bug', 'task', 'story'],
+    enum: TASK_TYPES,
     required: true,
   })
-  type: 'bug' | 'task' | 'story';
+  type: TaskType;
 
   @Prop({
     type: String,
@@ -46,10 +48,10 @@ export class Task extends Document {
 
   @Prop({
     type: String,
-    enum: ['low', 'medium', 'high', 'critical'],
+    enum: TASK_PRIORITIES,
     default: 'medium',
   })
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  priority: TaskPriority;
 
   @Prop({
     type: [String],

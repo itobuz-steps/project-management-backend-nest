@@ -10,6 +10,7 @@ import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { MailService } from '../../utils/sendVerificationMail';
+import { UserDocument } from './schemas/user.schema';
 
 @Controller('auth')
 export class AuthController {
@@ -24,7 +25,7 @@ export class AuthController {
 
       const hashedPassword = await bcrypt.hash(password, 10);
 
-      let user;
+      let user: UserDocument;
 
       try {
         user = await this.authService.getUserByEmail(email);
@@ -52,7 +53,9 @@ export class AuthController {
         message: 'User successfully registered',
       };
     } catch (err) {
-      throw new BadRequestException(err?.message ?? 'Signup failed');
+      if (err instanceof Error) {
+        throw new BadRequestException(err?.message ?? 'Signup failed');
+      }
     }
   }
 
@@ -68,7 +71,9 @@ export class AuthController {
         message: 'User verified successfully',
       };
     } catch (err) {
-      throw new BadRequestException(err?.message ?? 'Verification failed');
+      if (err instanceof Error) {
+        throw new BadRequestException(err?.message ?? 'Verification failed');
+      }
     }
   }
 }

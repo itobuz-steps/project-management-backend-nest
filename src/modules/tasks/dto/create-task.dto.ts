@@ -8,7 +8,8 @@ import {
   IsNumber,
   IsMongoId,
 } from 'class-validator';
-
+import { TASK_PRIORITIES, TASK_TYPES } from '../../../constants/task.constants';
+import type { TaskPriority, TaskType } from '../../../constants/task.constants';
 export class CreateTaskDto {
   @ApiProperty({
     description: 'ID of the project this task belongs to',
@@ -46,11 +47,11 @@ export class CreateTaskDto {
 
   @ApiProperty({
     description: 'Type of the task',
-    enum: ['bug', 'task', 'story'],
+    enum: TASK_TYPES,
     example: 'task',
   })
-  @IsEnum(['bug', 'task', 'story'])
-  type: 'bug' | 'task' | 'story';
+  @IsEnum(TASK_TYPES)
+  type: TaskType;
 
   @ApiProperty({
     description: 'Current status of the task',
@@ -61,13 +62,13 @@ export class CreateTaskDto {
 
   @ApiProperty({
     description: 'Priority level of the task',
-    enum: ['low', 'medium', 'high', 'critical'],
+    enum: TASK_PRIORITIES,
     example: 'medium',
     required: false,
   })
   @IsOptional()
-  @IsEnum(['low', 'medium', 'high', 'critical'])
-  priority?: 'low' | 'medium' | 'high' | 'critical';
+  @IsEnum(TASK_PRIORITIES)
+  priority?: TaskPriority;
 
   @ApiProperty({
     description: 'Tags associated with the task',

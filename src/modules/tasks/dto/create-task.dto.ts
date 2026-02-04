@@ -81,39 +81,6 @@ export class CreateTaskDto {
   tags?: string[];
 
   @ApiProperty({
-    description: 'Task IDs that this task blocks',
-    type: [String],
-    example: ['507f1f77bcf86cd799439011'],
-    required: false,
-  })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  blocks?: string[];
-
-  @ApiProperty({
-    description: 'Task IDs that block this task',
-    type: [String],
-    example: ['507f1f77bcf86cd799439012'],
-    required: false,
-  })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  blockedBy?: string[];
-
-  @ApiProperty({
-    description: 'Related task IDs',
-    type: [String],
-    example: ['507f1f77bcf86cd799439013'],
-    required: false,
-  })
-  @IsOptional()
-  @IsArray()
-  @IsMongoId({ each: true })
-  relatesTo?: string[];
-
-  @ApiProperty({
     description: 'Due date for the task',
     example: '2024-12-31T23:59:59.000Z',
     required: false,

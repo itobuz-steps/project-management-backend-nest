@@ -6,6 +6,7 @@ import {
   ConflictException,
   Req,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -20,6 +21,7 @@ import { TokenGeneratorService } from 'src/utils/tokenGenerator';
 import type { AppConfig } from 'src/config/app.config';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { IsAuthenticated } from '../../middlewares/isAuthenticated';
 
 type AuthenticatedRequest = Request & { user?: UserDocument };
 
@@ -195,6 +197,7 @@ export class AuthController {
   }
 
   @Post('refresh-token')
+  @UseGuards(IsAuthenticated)
   refreshToken(@Req() req: AuthenticatedRequest) {
     try {
       const user = req.user;

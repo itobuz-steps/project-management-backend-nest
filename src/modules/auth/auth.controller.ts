@@ -15,8 +15,6 @@ import { UserDocument } from './schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { TokenGeneratorService } from 'src/utils/tokenGenerator';
 import type { AppConfig } from 'src/config/app.config';
-import { SendOtpDto } from './dto/send-otp.dto';
-import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -127,64 +125,6 @@ export class AuthController {
     } catch (err) {
       if (err instanceof Error) {
         throw new BadRequestException(err?.message ?? 'Login failed');
-      }
-    }
-  }
-
-  @Post('send-otp')
-  async sendOtp(@Body() sendOtpDto: SendOtpDto) {
-    try {
-      const { email } = sendOtpDto ?? {};
-
-      if (!email) {
-        throw new BadRequestException('Email is required');
-      }
-
-      const user = await this.authService.getUserByEmail(email);
-
-      if (!user.verified) {
-        throw new BadRequestException('User is not verified');
-      }
-
-      const otp = await this.authService.generateOtp(user._id);
-
-      await this.mailService.sendVerificationMail(email, otp);
-
-      return {
-        success: true,
-        message: 'OTP sent successfully',
-      };
-    } catch (err) {
-      if (err instanceof Error) {
-        throw new BadRequestException(err?.message ?? 'Sending OTP failed');
-      }
-    }
-  }
-
-  @Post('reset-password')
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    try {
-      const { email, otp, password } = resetPasswordDto ?? {};
-
-      if (!password || !otp || !email) {
-        throw new BadRequestException('Email, OTP and password are required');
-      }
-
-      if (typeof password !== 'string') {
-        throw new BadRequestException('Password must be a string');
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      await this.authService.resetPassword(email, otp, hashedPassword);
-
-      return {
-        success: true,
-        message: 'Password reset successful',
-      };
-    } catch (err) {
-      if (err instanceof Error) {
-        throw new BadRequestException(err?.message ?? 'Password reset failed');
       }
     }
   }

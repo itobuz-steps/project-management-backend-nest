@@ -4,9 +4,12 @@ import {
   Post,
   BadRequestException,
   ConflictException,
+  Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -17,6 +20,8 @@ import { TokenGeneratorService } from 'src/utils/tokenGenerator';
 import type { AppConfig } from 'src/config/app.config';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+
+type AuthenticatedRequest = Request & { user?: UserDocument };
 
 @Controller('auth')
 export class AuthController {
@@ -185,6 +190,47 @@ export class AuthController {
     } catch (err) {
       if (err instanceof Error) {
         throw new BadRequestException(err?.message ?? 'Password reset failed');
+      }
+    }
+  }
+
+  @Post('refresh-token')
+  refreshToken(@Req() req: AuthenticatedRequest) {
+    try {
+      const user = req.user;
+
+      if (!user) {
+        throw new UnauthorizedException('Unauthorized');
+      }
+
+      const newAccessToken = this.tokenGeneratorService.generateToken(
+        user._id.toString(),
+        user.email,
+        this.configService.get<string>('JWT_ACCESS_KEY') ?? 'secret access key',
+        this.configService.get<AppConfig['JWT_ACCESS_EXPIRATION']>(
+          'JWT_ACCESS_EXPIRATION',
+        ),
+      );
+
+      const newRefreshToken = this.tokenGeneratorService.generateToken(
+        user._id.toString(),
+        user.email,
+        this.configService.get<string>('JWT_REFRESH_KEY') ??
+          'secret refresh key',
+        this.configService.get<AppConfig['JWT_REFRESH_EXPIRATION']>(
+          'JWT_REFRESH_EXPIRATION',
+        ),
+      );
+
+      return {
+        success: true,
+        message: 'Tokens refreshed',
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+      };
+    } catch (err) {
+      if (err instanceof Error) {
+        throw new BadRequestException(err?.message ?? 'Token refresh failed');
       }
     }
   }

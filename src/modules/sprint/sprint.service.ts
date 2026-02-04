@@ -8,6 +8,8 @@ import { Model, Types } from 'mongoose';
 import { Sprint } from './schema/sprint.schema';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
+import { CreateSprintDto } from './dto/create-sprint.dto';
+import { UpdateSprintDto } from './dto/update-sprint.dto';
 
 @Injectable()
 export class SprintService {
@@ -61,5 +63,116 @@ export class SprintService {
     }
 
     return this.sprintModel.find({ projectId: projectObjectId });
+  }
+
+  async createSprint(
+    userId: ObjectIdLike,
+    dto: CreateSprintDto,
+  ): Promise<Sprint> {
+    const project = await this.projectModel.findOne({
+      _id: dto.projectId,
+      'members.user': userId,
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    const sprint = new this.sprintModel({
+      ...dto,
+      key: `${project.prefix}-sprint-${project.sprintCount + 1}`,
+    });
+
+    project.sprintCount += 1;
+
+    await sprint.save();
+    await project.save();
+
+    return sprint;
+  }
+
+  async updateSprint(
+    userId: ObjectIdLike,
+    sprintId: ObjectIdLike,
+    update: UpdateSprintDto,
+  ): Promise<Sprint> {
+    const sprint = await this.sprintModel.findById(sprintId);
+
+    if (!sprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    const project = await this.projectModel.findOne({
+      _id: sprint.projectId,
+      'members.user': userId,
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    const updatedSprint = await this.sprintModel.findByIdAndUpdate(
+      sprintId,
+      { $set: update },
+      { new: true },
+    );
+
+    if (!updatedSprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    return updatedSprint;
+  }
+
+  // async deleteSprint(
+  //   userId: ObjectIdLike,
+  //   sprintId: ObjectIdLike,
+  // ): Promise<Sprint> {
+  //   const sprint = await this.sprintModel.findById(sprintId);
+
+  //   if (!sprint) {
+  //     throw new NotFoundException('Sprint not found');
+  //   }
+
+  //   const project = await this.projectModel.findOne({
+  //     _id: sprint.projectId,
+  //     'members.user': userId,
+  //   });
+
+  //   if (!project) {
+  //     throw new ForbiddenException('Unauthorized');
+  //   }
+
+  //   const deletedSprint = await this.sprintModel.findByIdAndDelete(sprintId);
+
+  //   if (!deletedSprint) {
+  //     throw new NotFoundException('Sprint not found');
+  //   }
+
+  //   return deletedSprint;
+  // }
+
+  async deleteSprint(
+    userId: ObjectIdLike,
+    sprintId: ObjectIdLike,
+  ): Promise<Sprint> {
+    const sprint = await this.sprintModel.findOneAndDelete({
+      _id: sprintId,
+    });
+
+    if (!sprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    const project = await this.projectModel.exists({
+      _id: sprint.projectId,
+      'members.user': userId,
+    });
+
+    if (!project) {
+      throw new ForbiddenException('Unauthorized');
+    }
+
+    return sprint;
   }
 }

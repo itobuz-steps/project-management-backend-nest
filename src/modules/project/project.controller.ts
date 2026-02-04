@@ -11,9 +11,9 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { ProjectService } from './project.service';
-import type { AuthenticatedRequest } from './type/project.types';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
+import type { AuthenticatedRequest } from 'src/type/common.type';
 
 @Controller('projects')
 export class ProjectController {

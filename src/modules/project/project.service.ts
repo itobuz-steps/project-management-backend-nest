@@ -10,12 +10,15 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 import { ObjectIdLike } from 'src/type/common.type';
+import { NotificationPushService } from '../notification/services/notification-push.service';
 
 @Injectable()
 export class ProjectService {
   constructor(
     @InjectModel(Project.name)
     private readonly projectModel: Model<Project>,
+
+    private readonly notificationPushService: NotificationPushService,
   ) {}
 
   async getAllProjects(userId: ObjectIdLike): Promise<Project[]> {
@@ -71,7 +74,15 @@ export class ProjectService {
       prefix,
     });
 
-    return project.save();
+    const savedProject = await project.save();
+
+    await this.notificationPushService.pushNotificationToUser(userId, {
+      title: `Project "${savedProject.name}" Created`,
+      message: `Project "${savedProject.name}" was created`,
+      projectId: savedProject._id,
+    });
+
+    return savedProject;
   }
 
   async updateProject(
@@ -103,6 +114,15 @@ export class ProjectService {
       throw new ForbiddenException('Not allowed to update this project');
     }
 
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      project._id,
+      {
+        title: `Project "${project.name}" Updated`,
+        message: `Project "${project.name}" was updated`,
+        projectId: project._id,
+      },
+    );
+
     return project;
   }
 
@@ -110,7 +130,7 @@ export class ProjectService {
     userId: ObjectIdLike,
     projectId: ObjectIdLike,
   ): Promise<Project> {
-    const project = await this.projectModel.findOneAndDelete({
+    const project = await this.projectModel.findOne({
       _id: projectId,
       members: {
         $elemMatch: {
@@ -123,6 +143,17 @@ export class ProjectService {
     if (!project) {
       throw new NotFoundException('Project by given id not found');
     }
+
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      project._id,
+      {
+        title: `Project "${project.name}" Deleted`,
+        message: `Project "${project.name}" was deleted`,
+        projectId: project._id,
+      },
+    );
+
+    await project.deleteOne();
 
     return project;
   }

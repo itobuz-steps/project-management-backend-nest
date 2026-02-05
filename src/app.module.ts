@@ -10,6 +10,7 @@ import { MailSender } from './utils/mailSender';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { SprintModule } from './modules/sprint/sprint.module';
 import { CommentModule } from './modules/comment/comment.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { CommentModule } from './modules/comment/comment.module';
     TasksModule,
     SprintModule,
     CommentModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailSender],

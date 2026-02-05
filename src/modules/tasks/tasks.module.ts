@@ -6,6 +6,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
+import { NotificationModule } from '../notification/notification.module';
 @Module({
   controllers: [TasksController],
   providers: [TasksService],
@@ -14,6 +15,7 @@ import { Project, ProjectSchema } from '../project/schema/project.schema';
     MongooseModule.forFeature([{ name: Project.name, schema: ProjectSchema }]),
     JwtModule.register({}),
     AuthModule,
+    NotificationModule,
   ],
 })
 export class TasksModule {}

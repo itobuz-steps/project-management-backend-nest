@@ -14,6 +14,7 @@ async function bootstrap() {
     )
     .setVersion('1.0')
     .addTag('tasks', 'Task management endpoints')
+    .addTag('comments', 'Comment management endpoints')
     .addBearerAuth()
     .build();
 

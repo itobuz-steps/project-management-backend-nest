@@ -9,8 +9,11 @@ import {
   Req,
   UseGuards,
   Query,
+  UseInterceptors,
+  UploadedFiles,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -24,6 +27,7 @@ import {
   UpdateTaskDocs,
   DeleteTaskDocs,
 } from './tasks.swagger';
+import { multerOptionsForMultipleFiles } from 'src/config/multer.config';
 
 @UseGuards(IsAuthenticated)
 @ApiTags('tasks')
@@ -34,10 +38,58 @@ export class TasksController {
 
   @Post()
   @CreateTaskDocs()
+  @UseInterceptors(
+    FilesInterceptor('attachments', 10, multerOptionsForMultipleFiles),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        projectId: {
+          type: 'string',
+          description: 'ID of the project this task belongs to',
+        },
+        title: { type: 'string', description: 'Title of the task' },
+        description: {
+          type: 'string',
+          description: 'Detailed description of the task',
+        },
+        type: { type: 'string', description: 'Type of the task' },
+        status: { type: 'string', description: 'Current status of the task' },
+        priority: { type: 'string', description: 'Priority level of the task' },
+        tags: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Tags associated with the task',
+        },
+        dueDate: {
+          type: 'string',
+          format: 'date-time',
+          description: 'Due date for the task',
+        },
+        assignee: { type: 'string', description: 'User ID of the assignee' },
+        storyPoint: {
+          type: 'number',
+          description: 'Story points for the task',
+        },
+        attachments: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Optional attachment files (max 10)',
+        },
+      },
+      required: ['projectId', 'title', 'type', 'status'],
+    },
+  })
   async create(
     @Req() req: AuthenticatedRequest,
     @Body() createTaskDto: CreateTaskDto,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
+    if (files && files.length) {
+      createTaskDto.attachments = files.map((file) => file.filename);
+    }
     const result = await this.tasksService.create(req.user._id, createTaskDto);
     return { success: true, result };
   }

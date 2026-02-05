@@ -28,7 +28,7 @@ export class NotificationController {
     return { success: true };
   }
 
-  @Get('get')
+  @Get()
   async getAllNotifications(
     @Req() req: AuthenticatedRequest,
     @Query() query: PaginationDto,

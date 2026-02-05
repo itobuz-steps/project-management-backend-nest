@@ -11,12 +11,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { TaskFilters } from './interfaces/tasks.interface';
+import { NotificationPushService } from '../notification/services/notification-push.service';
 
 @Injectable()
 export class TasksService {
   constructor(
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
+    private readonly notificationPushService: NotificationPushService,
   ) {}
 
   async create(userId: ObjectIdLike, createTaskDto: CreateTaskDto) {
@@ -38,6 +40,19 @@ export class TasksService {
     project.lastKey += 1;
 
     await project.save();
+
+    // Send notification to assignee if task is assigned
+    if (newTask.assignee && newTask.assignee.toString() !== userId.toString()) {
+      await this.notificationPushService.pushNotificationToUser(
+        newTask.assignee,
+        {
+          title: `New Task Assigned: "${newTask.title}"`,
+          message: `You have been assigned to task "${newTask.title}" in project "${project.name}"`,
+          projectId: newTask.projectId,
+          taskId: newTask._id,
+        },
+      );
+    }
 
     return newTask;
   }
@@ -89,13 +104,13 @@ export class TasksService {
       });
     }
 
-    if (filter.tags instanceof Array && filter.tags && filter.tags.length > 0) {
+    if (filter.tags instanceof Array && filter.tags && filter.tags.length) {
       pipeline.push({
         $match: {
           tags: { $in: filter.tags },
         },
       });
-    } else if (typeof filter.tags === 'string' && filter.tags.length > 0) {
+    } else if (typeof filter.tags === 'string' && filter.tags.length) {
       pipeline.push({
         $match: {
           tags: { $in: [filter.tags] },
@@ -180,6 +195,45 @@ export class TasksService {
       },
     );
 
+    // Notify assignee if they were newly assigned
+    if (
+      updateTaskDto.assignee &&
+      task.assignee?.toString() !== updateTaskDto.assignee.toString() &&
+      updateTaskDto.assignee.toString() !== userId.toString()
+    ) {
+      await this.notificationPushService.pushNotificationToUser(
+        updateTaskDto.assignee,
+        {
+          title: `Task Assigned: "${task.title}"`,
+          message: `You have been assigned to task "${task.title}"`,
+          projectId: task.projectId,
+          taskId: task._id,
+        },
+      );
+    }
+
+    // Notify assignee and reporter about status change
+    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+      const usersToNotify = new Set<string>();
+      if (task.assignee && task.assignee.toString() !== userId.toString()) {
+        usersToNotify.add(task.assignee.toString());
+      }
+      if (task.reporter.toString() !== userId.toString()) {
+        usersToNotify.add(task.reporter.toString());
+      }
+
+      await Promise.all(
+        Array.from(usersToNotify).map((notifyUserId) =>
+          this.notificationPushService.pushNotificationToUser(notifyUserId, {
+            title: `Task Status Updated: "${task.title}"`,
+            message: `Task "${task.title}" status changed from "${task.status}" to "${updateTaskDto.status}"`,
+            projectId: task.projectId,
+            taskId: task._id,
+          }),
+        ),
+      );
+    }
+
     return updatedTask;
   }
 
@@ -191,6 +245,25 @@ export class TasksService {
     }
 
     await this.checkMembership(userId, task.projectId);
+
+    // Notify assignee and reporter about task deletion
+    const usersToNotify = new Set<string>();
+    if (task.assignee && task.assignee.toString() !== userId.toString()) {
+      usersToNotify.add(task.assignee.toString());
+    }
+    if (task.reporter.toString() !== userId.toString()) {
+      usersToNotify.add(task.reporter.toString());
+    }
+
+    await Promise.all(
+      Array.from(usersToNotify).map((notifyUserId) =>
+        this.notificationPushService.pushNotificationToUser(notifyUserId, {
+          title: `Task Deleted: "${task.title}"`,
+          message: `Task "${task.title}" has been deleted`,
+          projectId: task.projectId,
+        }),
+      ),
+    );
 
     const deletedTask = await this.taskModel.findByIdAndDelete(id);
 

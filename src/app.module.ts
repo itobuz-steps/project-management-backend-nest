@@ -10,6 +10,7 @@ import { MailSender } from './utils/mailSender';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { SprintModule } from './modules/sprint/sprint.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { NotificationModule } from './modules/notification/notification.module';
     TasksModule,
     SprintModule,
     NotificationModule,
+    ScheduleModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService, MailSender],

@@ -7,6 +7,7 @@ import { Subscription } from '../schemas/subscription.schema';
 import { WebPushService } from './web-push.service';
 import { PushNotificationPayload } from '../type/notification.type';
 import { ObjectIdLike } from 'src/type/common.type';
+import { Project } from 'src/modules/project/schema/project.schema';
 
 @Injectable()
 export class NotificationPushService {
@@ -16,6 +17,9 @@ export class NotificationPushService {
 
     @InjectModel(Notification.name)
     private readonly notificationModel: Model<Notification>,
+
+    @InjectModel(Project.name)
+    private readonly projectModel: Model<Project>,
 
     private readonly webPushService: WebPushService,
   ) {}
@@ -51,5 +55,24 @@ export class NotificationPushService {
     }
 
     return notification;
+  }
+
+  async pushNotificationToProjectMembers(
+    projectId: ObjectIdLike,
+    payload: PushNotificationPayload,
+  ): Promise<void> {
+    const project = await this.projectModel
+      .findById(projectId)
+      .select('members.user');
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const memberIds = project.members.map((member) => member.user.toString());
+
+    await Promise.all(
+      memberIds.map((userId) => this.pushNotificationToUser(userId, payload)),
+    );
   }
 }

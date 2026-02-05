@@ -10,6 +10,7 @@ import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { UpdateSprintDto } from './dto/update-sprint.dto';
+import { NotificationPushService } from '../notification/services/notification-push.service';
 
 @Injectable()
 export class SprintService {
@@ -18,6 +19,8 @@ export class SprintService {
     private readonly sprintModel: Model<Sprint>,
     @InjectModel(Project.name)
     private readonly projectModel: Model<Project>,
+
+    private readonly notificationPushService: NotificationPushService,
   ) {}
 
   async getAllSprints(): Promise<Sprint[]> {
@@ -88,6 +91,15 @@ export class SprintService {
     await sprint.save();
     await project.save();
 
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      project._id,
+      {
+        title: `Sprint ${sprint.key} Created`,
+        message: `Sprint ${sprint.key} has been created`,
+        projectId: project._id,
+      },
+    );
+
     return sprint;
   }
 
@@ -121,6 +133,15 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      project._id,
+      {
+        title: `Sprint ${sprint.key} Updated`,
+        message: `Sprint ${sprint.key} has been updated`,
+        projectId: project._id,
+      },
+    );
+
     return updatedSprint;
   }
 
@@ -128,9 +149,7 @@ export class SprintService {
     userId: ObjectIdLike,
     sprintId: ObjectIdLike,
   ): Promise<Sprint> {
-    const sprint = await this.sprintModel.findOneAndDelete({
-      _id: sprintId,
-    });
+    const sprint = await this.sprintModel.findById(sprintId);
 
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
@@ -144,6 +163,17 @@ export class SprintService {
     if (!project) {
       throw new ForbiddenException('Unauthorized');
     }
+
+    await sprint.deleteOne();
+
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      project._id,
+      {
+        title: `Sprint ${sprint.key} Deleted`,
+        message: `Sprint ${sprint.key} has been deleted`,
+        projectId: project._id,
+      },
+    );
 
     return sprint;
   }
@@ -181,6 +211,15 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      sprint.projectId,
+      {
+        title: `${tasks.length} task(s) added to sprint ${updatedSprint.key}`,
+        message: `${tasks.length} task(s) added to sprint ${updatedSprint.key}`,
+        projectId: sprint.projectId,
+      },
+    );
+
     return updatedSprint;
   }
 
@@ -213,6 +252,16 @@ export class SprintService {
     if (!updatedSprint) {
       throw new NotFoundException('Sprint not found');
     }
+
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      sprint.projectId,
+      {
+        title: `Task Removed from sprint ${updatedSprint.key}`,
+        message: `A task was removed from sprint ${updatedSprint.key}`,
+        projectId: sprint.projectId,
+        taskId,
+      },
+    );
 
     return updatedSprint;
   }

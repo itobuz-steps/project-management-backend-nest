@@ -87,7 +87,7 @@ export class TasksController {
     @Body() createTaskDto: CreateTaskDto,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    if (files && files.length > 0) {
+    if (files && files.length) {
       createTaskDto.attachments = files.map((file) => file.filename);
     }
     const result = await this.tasksService.create(req.user._id, createTaskDto);

@@ -7,6 +7,7 @@ import { Task, TaskSchema } from '../tasks/entities/task.entity';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AuthModule } from '../auth/auth.module';
     ]),
     JwtModule.register({}),
     AuthModule,
+    NotificationModule,
   ],
   controllers: [CommentController],
   providers: [CommentService],

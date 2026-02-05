@@ -11,6 +11,7 @@ import { Comment } from './entities/comment.entity';
 import { Task } from '../tasks/entities/task.entity';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
+import { NotificationPushService } from '../notification/services/notification-push.service';
 
 @Injectable()
 export class CommentService {
@@ -18,6 +19,7 @@ export class CommentService {
     @InjectModel(Comment.name) private readonly commentModel: Model<Comment>,
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
+    private readonly notificationPushService: NotificationPushService,
   ) {}
 
   async getCommentsByTaskId(
@@ -36,13 +38,37 @@ export class CommentService {
     taskId: ObjectIdLike,
     createCommentDto: CreateCommentDto,
   ): Promise<Comment> {
-    await this.checkMembership(userId, taskId);
+    const task = await this.checkMembership(userId, taskId);
 
     const newComment = await this.commentModel.create({
       ...createCommentDto,
       taskId,
       author: userId,
     });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    // Notify assignee and reporter about new comment (excluding the commenter)
+    const usersToNotify = new Set<string>();
+    if (task.assignee && task.assignee.toString() !== userId.toString()) {
+      usersToNotify.add(task.assignee.toString());
+    }
+    if (task.reporter.toString() !== userId.toString()) {
+      usersToNotify.add(task.reporter.toString());
+    }
+
+    await Promise.all(
+      Array.from(usersToNotify).map((notifyUserId) =>
+        this.notificationPushService.pushNotificationToUser(notifyUserId, {
+          title: `New Comment on "${task.title}"`,
+          message: `A new comment was added to task "${task.title}"`,
+          projectId: task.projectId,
+          taskId: task._id,
+        }),
+      ),
+    );
 
     return newComment;
   }
@@ -104,5 +130,7 @@ export class CommentService {
         'User is not authorized to comment on this task',
       );
     }
+
+    return task;
   }
 }

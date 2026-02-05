@@ -9,6 +9,6 @@ export interface TaskFilters {
   sortOrder?: 'asc' | 'desc';
   priority?: TaskPriority;
   status?: string;
-  tags?: string[];
+  tags?: string[] | string;
   assignee?: ObjectIdLike;
 }

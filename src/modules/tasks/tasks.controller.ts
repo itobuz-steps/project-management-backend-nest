@@ -121,10 +121,13 @@ export class TasksController {
   @ApiQuery({
     name: 'tags',
     required: false,
-    description: 'Filter tasks by tags (comma-separated)',
-    example: 'frontend,urgent',
+    description:
+      'Filter tasks by tags (use multiple query parameters: ?tags=frontend&tags=urgent)',
+    example: 'frontend',
     type: String,
     isArray: true,
+    style: 'form',
+    explode: true,
   })
   @ApiQuery({
     name: 'assignee',

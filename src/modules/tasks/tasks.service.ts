@@ -89,10 +89,16 @@ export class TasksService {
       });
     }
 
-    if (filter.tags && filter.tags.length > 0) {
+    if (filter.tags instanceof Array && filter.tags && filter.tags.length > 0) {
       pipeline.push({
         $match: {
           tags: { $in: filter.tags },
+        },
+      });
+    } else if (typeof filter.tags === 'string' && filter.tags.length > 0) {
+      pipeline.push({
+        $match: {
+          tags: { $in: [filter.tags] },
         },
       });
     }

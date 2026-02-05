@@ -7,6 +7,7 @@ import {
   Req,
   UnauthorizedException,
   UseGuards,
+  Get,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -192,7 +193,7 @@ export class AuthController {
     }
   }
 
-  @Post('refresh-token')
+  @Get('refresh-token')
   @UseGuards(IsAuthenticated)
   refreshToken(@Req() req: AuthenticatedRequest) {
     try {

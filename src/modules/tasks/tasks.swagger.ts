@@ -8,6 +8,8 @@ import {
 } from '@nestjs/swagger';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { TASK_PRIORITIES } from 'src/constants/task.constants';
+import { Task } from './entities/task.entity';
 
 // Common response schemas
 const SuccessResponse = (description: string) => ({
@@ -75,17 +77,7 @@ export function GetAllTasksDocs() {
       name: 'sortBy',
       required: false,
       description: 'Field to sort by',
-      enum: [
-        'title',
-        'priority',
-        'status',
-        'dueDate',
-        'createdAt',
-        'updatedAt',
-        'type',
-        'key',
-        'storyPoint',
-      ],
+      enum: [...Object.keys(Task), 'createdAt', 'updatedAt'],
       example: 'createdAt',
     }),
     ApiQuery({
@@ -99,7 +91,7 @@ export function GetAllTasksDocs() {
       name: 'priority',
       required: false,
       description: 'Filter tasks by priority level',
-      enum: ['low', 'medium', 'high', 'critical'],
+      enum: TASK_PRIORITIES,
       example: 'high',
     }),
     ApiQuery({

@@ -24,25 +24,7 @@ export class CommentService {
     userId: ObjectIdLike,
     taskId: ObjectIdLike,
   ): Promise<Comment[]> {
-    const task = await this.taskModel.findById(taskId);
-    console.log(
-      `Fetching comments for task ${String(taskId)} by user ${String(userId)}`,
-    );
-
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
-
-    const project = await this.projectModel.findOne({
-      _id: task.projectId,
-      'members.user': userId,
-    });
-
-    if (!project) {
-      throw new UnauthorizedException(
-        'User is not authorized to view comments for this task',
-      );
-    }
+    await this.checkMembership(userId, taskId);
 
     return this.commentModel
       .find({ taskId })
@@ -54,22 +36,7 @@ export class CommentService {
     taskId: ObjectIdLike,
     createCommentDto: CreateCommentDto,
   ): Promise<Comment> {
-    const task = await this.taskModel.findById(taskId);
-
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
-
-    const project = await this.projectModel.findOne({
-      _id: task.projectId,
-      'members.user': userId,
-    });
-
-    if (!project) {
-      throw new UnauthorizedException(
-        'User is not authorized to comment on this task',
-      );
-    }
+    await this.checkMembership(userId, taskId);
 
     const newComment = await this.commentModel.create({
       ...createCommentDto,
@@ -90,17 +57,7 @@ export class CommentService {
       throw new NotFoundException('Comment not found');
     }
 
-    const task = await this.taskModel.findById(comment.taskId);
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
-
-    const project = await this.projectModel.findOne({
-      _id: task.projectId,
-      'members.user': userId,
-    });
-
-    if (!project) {
+    if (comment.author.toString() !== userId.toString()) {
       throw new UnauthorizedException(
         'User is not authorized to update this comment',
       );
@@ -128,5 +85,24 @@ export class CommentService {
     }
 
     return this.commentModel.findByIdAndDelete(commentId);
+  }
+
+  async checkMembership(userId: ObjectIdLike, taskId: ObjectIdLike) {
+    const task = await this.taskModel.findById(taskId);
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    const project = await this.projectModel.findOne({
+      _id: task.projectId,
+      'members.user': userId,
+    });
+
+    if (!project) {
+      throw new UnauthorizedException(
+        'User is not authorized to comment on this task',
+      );
+    }
   }
 }

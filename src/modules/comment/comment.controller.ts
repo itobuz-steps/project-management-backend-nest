@@ -8,13 +8,17 @@ import {
   Req,
   UseGuards,
   Patch,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { CommentService } from './comment.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import type { AuthenticatedRequest } from 'src/type/common.type';
+import { multerOptionsForSingleFile } from 'src/config/multer.config';
 
 @UseGuards(IsAuthenticated)
 @ApiTags('comments')
@@ -24,11 +28,31 @@ export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 
   @Post()
+  @UseInterceptors(FileInterceptor('attachment', multerOptionsForSingleFile))
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', description: 'The comment message content' },
+        attachment: {
+          type: 'string',
+          format: 'binary',
+          description: 'Optional attachment file',
+        },
+      },
+      required: ['message'],
+    },
+  })
   async create(
     @Req() req: AuthenticatedRequest,
     @Param('taskId') taskId: string,
     @Body() createCommentDto: CreateCommentDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
+    if (file) {
+      createCommentDto.attachment = file.filename;
+    }
     const result = await this.commentService.create(
       req.user._id,
       taskId,

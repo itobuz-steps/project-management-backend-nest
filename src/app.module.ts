@@ -9,6 +9,7 @@ import { ProjectModule } from './modules/project/project.module';
 import { MailSender } from './utils/mailSender';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { SprintModule } from './modules/sprint/sprint.module';
+import { NotificationModule } from './modules/notification/notification.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SprintModule } from './modules/sprint/sprint.module';
     AuthModule,
     TasksModule,
     SprintModule,
+    NotificationModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailSender],

@@ -16,12 +16,7 @@ import type { UserDocument } from '../auth/schemas/user.schema';
 import { User } from '../auth/schemas/user.schema';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { Project } from './schema/project.schema';
-import { ProjectRole } from './type/project.types';
-
-interface InvitePayload {
-  email: string;
-  projectId: string;
-}
+import { ProjectRole, InvitePayload } from './type/project.types';
 
 @Injectable()
 export class InviteUserService {

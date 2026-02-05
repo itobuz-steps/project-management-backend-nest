@@ -8,50 +8,44 @@ import {
   Post,
   Put,
   Req,
+  UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
 import { ProjectService } from './project.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import type { AuthenticatedRequest } from 'src/type/common.type';
+import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 
-@Controller('projects')
+@Controller('project')
+@UseGuards(IsAuthenticated)
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   @Get()
   async getAllProjects(@Req() req: AuthenticatedRequest) {
-    // const userId = req.user._id;
-    const userId = process.env.MY_USER;
-
-    return this.projectService.getAllProjects(userId);
+    return this.projectService.getAllProjects(req.user._id);
   }
 
-  // GET /projects/user-projects
   @Get('user-projects')
   async getProjectsByUserId(@Req() req: AuthenticatedRequest) {
-    // const userId = req.user._id;
-    const userId = process.env.MY_USER;
     return {
       success: true,
-      result: await this.projectService.getProjectsByUserId(userId),
+      result: await this.projectService.getProjectsByUserId(req.user._id),
     };
   }
 
   @Get(':id')
   async getProjectById(
-    // @Req() req: AuthenticatedRequest,
+    @Req() req: AuthenticatedRequest,
     @Param('id') projectId: string,
   ) {
-    // const userId = req.user._id;
-    const userId = process.env.MY_USER;
     return {
       success: true,
-      result: await this.projectService.getProjectById(userId, projectId),
+      result: await this.projectService.getProjectById(req.user._id, projectId),
     };
   }
 
-  @Get('get-user/:id')
+  @Get('/:id/get-user/')
   async getUserByProjectId(@Param('id') projectId: string) {
     const project = await this.projectService.getUserByProjectId(projectId);
 
@@ -65,42 +59,41 @@ export class ProjectController {
 
   @Post()
   async createProject(
-    // @Headers('x-user-id') userId: string,
+    @Req() req: AuthenticatedRequest,
     @Body() dto: CreateProjectDto,
   ) {
-    const userId = process.env.MY_USER;
     return {
       success: true,
-      result: await this.projectService.createProject(userId, dto),
+      result: await this.projectService.createProject(req.user._id, dto),
       message: 'Project created successfully',
     };
   }
 
-  // PUT /projects/:id
   @Put(':id')
   async updateProject(
     @Param('id') projectId: string,
-    // @Headers('x-user-id') userId: string,
+    @Req() req: AuthenticatedRequest,
     @Body() dto: UpdateProjectDto,
   ) {
-    const userId = process.env.MY_USER;
     return {
       success: true,
-      result: await this.projectService.updateProject(userId, projectId, dto),
+      result: await this.projectService.updateProject(
+        req.user._id,
+        projectId,
+        dto,
+      ),
       message: 'Project updated successfully',
     };
   }
 
-  // DELETE /projects/:id
   @Delete(':id')
   async deleteProject(
     @Param('id') projectId: string,
-    // @Headers('x-user-id') userId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
-    const userId = process.env.MY_USER;
     return {
       success: true,
-      result: await this.projectService.deleteProject(userId, projectId),
+      result: await this.projectService.deleteProject(req.user._id, projectId),
       message: 'Project successfully deleted',
     };
   }

@@ -9,7 +9,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { NotificationService } from './notification.service';
+import { NotificationService } from './services/notification.service';
 import { IsAuthenticated } from '../../middlewares/isAuthenticated';
 import { Request } from 'express';
 import type { AuthenticatedRequest } from 'src/type/common.type';

@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Notification } from './schemas/notification.schema';
-import { Subscription } from './schemas/subscription.schema';
-import { Project } from '../project/schema/project.schema';
-import { User } from '../auth/schemas/user.schema';
+import { Notification } from '../schemas/notification.schema';
+import { Subscription } from '../schemas/subscription.schema';
+import { Project } from '../../project/schema/project.schema';
+import { User } from '../../auth/schemas/user.schema';
 import { ObjectIdLike } from 'src/type/common.type';
-import { CreateSubscriptionDto } from './dto/create-subscription.dto';
+import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
 
 @Injectable()
 export class NotificationService {
@@ -28,7 +28,7 @@ export class NotificationService {
     const { email, subscription } = dto;
 
     const user = await this.userModel.findOne({ email });
-    //.
+
     if (!user) {
       return;
     }

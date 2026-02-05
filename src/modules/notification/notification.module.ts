@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { NotificationController } from './notification.controller';
-import { NotificationService } from './notification.service';
+import { NotificationService } from './services/notification.service';
 import {
   Notification,
   NotificationSchema,
@@ -14,6 +14,8 @@ import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationPushService } from './services/notification-push.service';
+import { WebPushService } from './services/web-push.service';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [NotificationController],
-  providers: [NotificationService],
+  providers: [NotificationService, WebPushService, NotificationPushService],
+  exports: [NotificationPushService],
 })
 export class NotificationModule {}

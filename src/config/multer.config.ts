@@ -1,6 +1,10 @@
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 import { BadRequestException } from '@nestjs/common';
+import {
+  ALLOWED_FILE_TYPES,
+  MAX_ATTACHMENT_FILE_SIZE,
+} from 'src/constants/attachment.constants';
 
 export const multerConfig = {
   storage: diskStorage({
@@ -20,32 +24,19 @@ export const multerConfig = {
     file: Express.Multer.File,
     callback: (error: Error | null, acceptFile: boolean) => void,
   ) => {
-    const allowedMimeTypes = [
-      'image/jpeg',
-      'image/png',
-      'image/gif',
-      'image/webp',
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain',
-    ];
-
-    if (allowedMimeTypes.includes(file.mimetype)) {
+    if (ALLOWED_FILE_TYPES.includes(file.mimetype)) {
       callback(null, true);
     } else {
       callback(
         new BadRequestException(
-          `File type ${file.mimetype} is not allowed. Allowed types: ${allowedMimeTypes.join(', ')}`,
+          `File type ${file.mimetype} is not allowed. Allowed types: ${ALLOWED_FILE_TYPES.join(', ')}`,
         ),
         false,
       );
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB max file size
+    fileSize: MAX_ATTACHMENT_FILE_SIZE, // 10MB max file size
   },
 };
 

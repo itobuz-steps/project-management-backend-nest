@@ -8,9 +8,11 @@ import { ProjectService } from './project.service';
 import { ProjectController } from './project.controller';
 import { InviteUserController } from './invite-user.controller';
 import { InviteUserService } from './invite-user.service';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
+    NotificationModule,
     MongooseModule.forFeature([
       { name: Project.name, schema: ProjectSchema },
       { name: User.name, schema: UserSchema },

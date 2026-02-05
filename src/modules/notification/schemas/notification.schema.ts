@@ -3,8 +3,6 @@ import { Document, Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Notification extends Document {
-  //   @Prop({ required: true })
-  //   userId: string;
   @Prop({ type: Types.ObjectId, ref: 'User' })
   userId: Types.ObjectId;
 
@@ -12,7 +10,7 @@ export class Notification extends Document {
   taskId?: string;
 
   @Prop()
-  projectId?: string;
+  projectId?: Types.ObjectId;
 
   @Prop({ default: 'Notification' })
   title: string;
@@ -20,7 +18,7 @@ export class Notification extends Document {
   @Prop()
   message?: string;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   profileImage?: string | null;
 
   @Prop({ default: true })

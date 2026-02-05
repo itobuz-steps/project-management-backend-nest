@@ -234,4 +234,23 @@ export class AuthController {
       }
     }
   }
+
+  @Get('profile')
+  @UseGuards(IsAuthenticated)
+  getProfile(@Req() req: AuthenticatedRequest) {
+    const user = req.user;
+
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    return {
+      success: true,
+      result: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+      },
+    };
+  }
 }

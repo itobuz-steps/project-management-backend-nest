@@ -7,3 +7,8 @@ export enum ProjectRole {
   MEMBER = 'member',
   ADMIN = 'admin',
 }
+
+export interface InvitePayload {
+  email: string;
+  projectId: string;
+}

@@ -19,6 +19,6 @@ import { IsAuthenticated } from '../../middlewares/isAuthenticated';
   ],
   controllers: [AuthController],
   providers: [AuthService, MailService, TokenGeneratorService, IsAuthenticated],
-  exports: [AuthService],
+  exports: [AuthService, IsAuthenticated, MailService],
 })
 export class AuthModule {}

@@ -6,6 +6,8 @@ import {
   Patch,
   Param,
   Delete,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,13 +20,15 @@ import {
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 
+@UseGuards(IsAuthenticated)
 @ApiTags('tasks')
 @ApiBearerAuth()
 @Controller('tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
-
+  s;
   @Post()
   @ApiOperation({ summary: 'Create a new task' })
   @ApiBody({ type: CreateTaskDto })
@@ -65,7 +69,8 @@ export class TasksController {
       },
     },
   })
-  async findAll() {
+  async findAll(@Req() req: Request & { user?: any }) {
+    console.log('Authenticated user:', req.user);
     const result = await this.tasksService.findAll();
     return { success: true, result };
   }

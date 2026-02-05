@@ -18,17 +18,6 @@ export class CreateTaskDto {
   @IsMongoId()
   projectId: string;
 
-  @ApiProperty({ description: 'Unique key for the task', example: 'TASK-001' })
-  @IsString()
-  key: string;
-
-  @ApiProperty({
-    description: 'Reporter of the task',
-    example: '507f1f77bcf86cd799439010',
-  })
-  @IsMongoId()
-  reporter: string;
-
   @ApiProperty({
     description: 'Title of the task',
     example: 'Implement authentication module',

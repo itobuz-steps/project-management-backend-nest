@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument, Types } from 'mongoose';
+import { Role } from '../types/auth.types';
 
 export type UserDocument = HydratedDocument<User>;
 
@@ -29,8 +30,11 @@ export class User {
   @Prop({ default: true })
   preferences: boolean;
 
-  @Prop({ default: 'admin' })
-  role: string;
+  @Prop({
+    enum: Role,
+    default: Role.ADMIN,
+  })
+  role: Role;
 
   @Prop({
     enum: ['offline', 'online'],

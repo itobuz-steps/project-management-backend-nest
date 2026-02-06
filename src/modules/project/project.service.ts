@@ -90,7 +90,7 @@ export class ProjectService {
     projectId: ObjectIdLike,
     update: UpdateProjectDto,
   ): Promise<Project> {
-    const updatePayload: Record<string, any> = { ...update };
+    const updatePayload = { ...update };
 
     if (update.name) {
       updatePayload.prefix = generateProjectPrefix(update.name);

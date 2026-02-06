@@ -15,9 +15,11 @@ import { Request } from 'express';
 import type { AuthenticatedRequest } from 'src/type/common.type';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { PaginationDto } from './dto/pagination.dto';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('notification')
 @UseGuards(IsAuthenticated)
+@ApiBearerAuth()
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 

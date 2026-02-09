@@ -11,6 +11,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../notification/services/notification-push.service';
+import { Role } from '../auth/types/auth.types';
 
 @Injectable()
 export class ProjectService {
@@ -21,10 +22,14 @@ export class ProjectService {
     private readonly notificationPushService: NotificationPushService,
   ) {}
 
-  async getAllProjects(userId: ObjectIdLike): Promise<Project[]> {
-    return this.projectModel.find({
-      'members.user': userId,
-    });
+  async getAllProjects(userId: ObjectIdLike, role: Role): Promise<Project[]> {
+    if (role === Role.ADMIN) {
+      return this.projectModel.find({
+        'members.user': userId,
+      });
+    } else {
+      return this.projectModel.find();
+    }
   }
 
   async getProjectById(

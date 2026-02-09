@@ -15,15 +15,19 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import type { AuthenticatedRequest } from 'src/type/common.type';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
+import { Role } from '../auth/types/auth.types';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @Controller('project')
-@UseGuards(IsAuthenticated)
+@UseGuards(IsAuthenticated, RolesGuard)
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   @Get()
+  @Roles(Role.ADMIN)
   async getAllProjects(@Req() req: AuthenticatedRequest) {
-    return this.projectService.getAllProjects(req.user._id);
+    return this.projectService.getAllProjects(req.user._id, req.user.role);
   }
 
   @Get('user-projects')
@@ -58,6 +62,7 @@ export class ProjectController {
   }
 
   @Post()
+  @Roles(Role.ADMIN)
   async createProject(
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateProjectDto,
@@ -70,6 +75,7 @@ export class ProjectController {
   }
 
   @Put(':id')
+  @Roles(Role.ADMIN)
   async updateProject(
     @Param('id') projectId: string,
     @Req() req: AuthenticatedRequest,
@@ -87,6 +93,7 @@ export class ProjectController {
   }
 
   @Delete(':id')
+  @Roles(Role.ADMIN)
   async deleteProject(
     @Param('id') projectId: string,
     @Req() req: AuthenticatedRequest,

@@ -9,6 +9,7 @@ import { ProjectController } from './project.controller';
 import { InviteUserController } from './invite-user.controller';
 import { InviteUserService } from './invite-user.service';
 import { NotificationModule } from '../notification/notification.module';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { NotificationModule } from '../notification/notification.module';
     AuthModule,
   ],
   controllers: [ProjectController, InviteUserController],
-  providers: [ProjectService, InviteUserService],
+  providers: [ProjectService, InviteUserService, RolesGuard],
   exports: [ProjectService],
 })
 export class ProjectModule {}

@@ -25,8 +25,6 @@ export class RolesGuard implements CanActivate {
 
     const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    console.log(req.user);
-
     const userRole = req.user.role;
 
     // superadmin bypasses everything

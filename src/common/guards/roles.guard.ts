@@ -47,6 +47,7 @@ export class RolesGuard implements CanActivate {
     const project = await this.projectService.getProjectById(
       request.user._id,
       projectId,
+      request.user.role,
     );
 
     const member = project.members.find(

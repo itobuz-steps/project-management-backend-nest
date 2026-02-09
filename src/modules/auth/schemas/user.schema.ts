@@ -32,7 +32,7 @@ export class User {
 
   @Prop({
     enum: Role,
-    default: Role.ADMIN,
+    default: Role.USER,
   })
   role: Role;
 

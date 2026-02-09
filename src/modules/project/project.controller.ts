@@ -17,15 +17,13 @@ import type { AuthenticatedRequest } from 'src/type/common.type';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import { Role } from '../auth/types/auth.types';
 import { Roles } from 'src/common/decorators/roles.decorator';
-import { RolesGuard } from 'src/common/guards/roles.guard';
 
 @Controller('project')
-@UseGuards(IsAuthenticated, RolesGuard)
+@UseGuards(IsAuthenticated)
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   @Get()
-  @Roles(Role.ADMIN)
   async getAllProjects(@Req() req: AuthenticatedRequest) {
     return this.projectService.getAllProjects(req.user._id, req.user.role);
   }
@@ -38,10 +36,10 @@ export class ProjectController {
     };
   }
 
-  @Get(':id')
+  @Get(':projectId')
   async getProjectById(
     @Req() req: AuthenticatedRequest,
-    @Param('id') projectId: string,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
@@ -49,8 +47,8 @@ export class ProjectController {
     };
   }
 
-  @Get('/:id/get-user/')
-  async getUserByProjectId(@Param('id') projectId: string) {
+  @Get('/:projectId/get-user/')
+  async getUserByProjectId(@Param('projectId') projectId: string) {
     const project = await this.projectService.getUserByProjectId(projectId);
 
     const users = project.members.map((member) => member.user);
@@ -74,10 +72,10 @@ export class ProjectController {
     };
   }
 
-  @Put(':id')
+  @Put(':projectId')
   @Roles(Role.ADMIN)
   async updateProject(
-    @Param('id') projectId: string,
+    @Param('projectId') projectId: string,
     @Req() req: AuthenticatedRequest,
     @Body() dto: UpdateProjectDto,
   ) {
@@ -92,10 +90,10 @@ export class ProjectController {
     };
   }
 
-  @Delete(':id')
+  @Delete(':projectId')
   @Roles(Role.ADMIN)
   async deleteProject(
-    @Param('id') projectId: string,
+    @Param('projectId') projectId: string,
     @Req() req: AuthenticatedRequest,
   ) {
     return {

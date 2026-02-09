@@ -19,7 +19,7 @@ import { RemoveTaskFromSprintDto } from './dto/remove-task-from-sprint.dto';
 import { AddTasksToSprintDto } from './dto/add-tasks-to-sprint.dto';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 
-@Controller('sprint')
+@Controller('/project/:projectId/sprint')
 @UseGuards(IsAuthenticated)
 export class SprintController {
   constructor(private readonly sprintService: SprintService) {}
@@ -39,10 +39,10 @@ export class SprintController {
     };
   }
 
-  @Get(':id')
+  @Get(':sprintId')
   async getSprintById(
     @Req() req: AuthenticatedRequest,
-    @Param('id') sprintId: string,
+    @Param('sprintId') sprintId: string,
   ) {
     const sprint = await this.sprintService.getSprintById(
       req.user._id,
@@ -67,10 +67,10 @@ export class SprintController {
     };
   }
 
-  @Put(':id')
+  @Put(':sprintId')
   async updateSprint(
     @Req() req: AuthenticatedRequest,
-    @Param('id') sprintId: string,
+    @Param('sprintId') sprintId: string,
     @Body() dto: UpdateSprintDto,
   ) {
     return {
@@ -84,10 +84,10 @@ export class SprintController {
     };
   }
 
-  @Delete(':id')
+  @Delete(':sprintId')
   async deleteSprint(
     @Req() req: AuthenticatedRequest,
-    @Param('id') sprintId: string,
+    @Param('sprintId') sprintId: string,
   ) {
     return {
       success: true,
@@ -96,10 +96,10 @@ export class SprintController {
     };
   }
 
-  @Patch(':id/add-tasks')
+  @Patch(':sprintId/add-tasks')
   async addTasksIntoSprint(
     @Req() req: AuthenticatedRequest,
-    @Param('id') sprintId: string,
+    @Param('sprintId') sprintId: string,
     @Body() dto: AddTasksToSprintDto,
   ) {
     return {
@@ -113,10 +113,10 @@ export class SprintController {
     };
   }
 
-  @Patch(':id/remove-task')
+  @Patch(':sprintId/remove-task')
   async removeTaskFromSprint(
     @Req() req: AuthenticatedRequest,
-    @Param('id') sprintId: string,
+    @Param('sprintId') sprintId: string,
     @Body() dto: RemoveTaskFromSprintDto,
   ) {
     return {

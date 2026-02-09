@@ -32,7 +32,7 @@ import { multerOptionsForMultipleFiles } from 'src/config/multer.config';
 @UseGuards(IsAuthenticated)
 @ApiTags('tasks')
 @ApiBearerAuth()
-@Controller('tasks')
+@Controller('project/:projectId/tasks')
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 

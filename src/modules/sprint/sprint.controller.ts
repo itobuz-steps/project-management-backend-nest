@@ -18,9 +18,11 @@ import { CreateSprintDto } from './dto/create-sprint.dto';
 import { RemoveTaskFromSprintDto } from './dto/remove-task-from-sprint.dto';
 import { AddTasksToSprintDto } from './dto/add-tasks-to-sprint.dto';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('/project/:projectId/sprint')
 @UseGuards(IsAuthenticated)
+@ApiBearerAuth()
 export class SprintController {
   constructor(private readonly sprintService: SprintService) {}
 

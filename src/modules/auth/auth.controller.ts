@@ -23,6 +23,7 @@ import type { AppConfig } from 'src/config/app.config';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { IsAuthenticated } from '../../middlewares/isAuthenticated';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 type AuthenticatedRequest = Request & { user?: UserDocument };
 
@@ -195,6 +196,7 @@ export class AuthController {
 
   @Get('refresh-token')
   @UseGuards(IsAuthenticated)
+  @ApiBearerAuth()
   refreshToken(@Req() req: AuthenticatedRequest) {
     try {
       const user = req.user;
@@ -237,6 +239,7 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(IsAuthenticated)
+  @ApiBearerAuth()
   getProfile(@Req() req: AuthenticatedRequest) {
     const user = req.user;
 

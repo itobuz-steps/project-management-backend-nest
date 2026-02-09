@@ -15,8 +15,10 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import type { AuthenticatedRequest } from 'src/type/common.type';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('project')
+@ApiBearerAuth()
 @UseGuards(IsAuthenticated)
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}

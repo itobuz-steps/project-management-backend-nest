@@ -75,12 +75,16 @@ export class SprintService {
 
   async createSprint(
     userId: ObjectIdLike,
+    projectId: ObjectIdLike,
     dto: CreateSprintDto,
+    role: Role,
   ): Promise<Sprint> {
-    const project = await this.projectModel.findOne({
-      _id: dto.projectId,
-      'members.user': userId,
-    });
+    const project = await getProjectWithAccess(
+      this.projectModel,
+      projectId,
+      userId,
+      role,
+    );
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
@@ -88,6 +92,7 @@ export class SprintService {
 
     const sprint = new this.sprintModel({
       ...dto,
+      projectId,
       key: `${project.prefix}-sprint-${project.sprintCount + 1}`,
     });
 
@@ -110,8 +115,10 @@ export class SprintService {
 
   async updateSprint(
     userId: ObjectIdLike,
+    projectId: ObjectIdLike,
     sprintId: ObjectIdLike,
     update: UpdateSprintDto,
+    role: Role,
   ): Promise<Sprint> {
     const sprint = await this.sprintModel.findById(sprintId);
 
@@ -119,10 +126,12 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: sprint.projectId,
-      'members.user': userId,
-    });
+    const project = await getProjectWithAccess(
+      this.projectModel,
+      projectId,
+      userId,
+      role,
+    );
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
@@ -152,7 +161,9 @@ export class SprintService {
 
   async deleteSprint(
     userId: ObjectIdLike,
+    projectId: ObjectIdLike,
     sprintId: ObjectIdLike,
+    role: Role,
   ): Promise<Sprint> {
     const sprint = await this.sprintModel.findById(sprintId);
 
@@ -160,10 +171,12 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.exists({
-      _id: sprint.projectId,
-      'members.user': userId,
-    });
+    const project = await getProjectWithAccess(
+      this.projectModel,
+      projectId,
+      userId,
+      role,
+    );
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
@@ -185,8 +198,10 @@ export class SprintService {
 
   async addTasksIntoSprint(
     userId: ObjectIdLike,
+    projectId: ObjectIdLike,
     sprintId: ObjectIdLike,
     tasks: ObjectIdLike[],
+    role: Role,
   ): Promise<Sprint> {
     const sprint = await this.sprintModel.findById(sprintId);
 
@@ -194,10 +209,12 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: sprint.projectId,
-      'members.user': userId,
-    });
+    const project = await getProjectWithAccess(
+      this.projectModel,
+      projectId,
+      userId,
+      role,
+    );
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
@@ -230,8 +247,10 @@ export class SprintService {
 
   async removeTaskFromSprint(
     userId: ObjectIdLike,
+    projectId: ObjectIdLike,
     sprintId: ObjectIdLike,
     taskId: ObjectIdLike,
+    role: Role,
   ): Promise<Sprint> {
     const sprint = await this.sprintModel.findById(sprintId);
 
@@ -239,10 +258,12 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: sprint.projectId,
-      'members.user': userId,
-    });
+    const project = await getProjectWithAccess(
+      this.projectModel,
+      projectId,
+      userId,
+      role,
+    );
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');

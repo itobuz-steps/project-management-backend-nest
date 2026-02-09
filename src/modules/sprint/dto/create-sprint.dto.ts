@@ -8,9 +8,6 @@ import {
 } from 'class-validator';
 
 export class CreateSprintDto {
-  @IsMongoId()
-  projectId: string;
-
   @IsOptional()
   @IsDateString()
   dueDate?: Date;

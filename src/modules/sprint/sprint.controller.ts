@@ -66,10 +66,16 @@ export class SprintController {
   async createSprint(
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.sprintService.createSprint(req.user._id, dto),
+      result: await this.sprintService.createSprint(
+        req.user._id,
+        projectId,
+        dto,
+        req.user.role,
+      ),
       message: 'Sprint created successfully',
     };
   }
@@ -80,13 +86,16 @@ export class SprintController {
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
     @Body() dto: UpdateSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
       result: await this.sprintService.updateSprint(
         req.user._id,
+        projectId,
         sprintId,
         dto,
+        req.user.role,
       ),
       message: 'Sprint updated successfully',
     };
@@ -97,10 +106,16 @@ export class SprintController {
   async deleteSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.sprintService.deleteSprint(req.user._id, sprintId),
+      result: await this.sprintService.deleteSprint(
+        req.user._id,
+        projectId,
+        sprintId,
+        req.user.role,
+      ),
       message: 'Sprint successfully deleted',
     };
   }
@@ -111,13 +126,16 @@ export class SprintController {
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
     @Body() dto: AddTasksToSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
       result: await this.sprintService.addTasksIntoSprint(
         req.user._id,
+        projectId,
         sprintId,
         dto.tasks,
+        req.user.role,
       ),
       message: 'Tasks added into sprint successfully',
     };
@@ -129,13 +147,16 @@ export class SprintController {
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
     @Body() dto: RemoveTaskFromSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
       result: await this.sprintService.removeTaskFromSprint(
         req.user._id,
+        projectId,
         sprintId,
         dto.task,
+        req.user.role,
       ),
       message: 'Sprint tasks updated successfully',
     };

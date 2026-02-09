@@ -7,6 +7,7 @@ import { SprintController } from './sprint.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
+import { ProjectService } from '../project/project.service';
 
 @Module({
   imports: [
@@ -19,7 +20,14 @@ import { NotificationModule } from '../notification/notification.module';
     AuthModule,
   ],
   controllers: [SprintController],
-  providers: [SprintService],
+  providers: [
+    SprintService,
+    ProjectService,
+    {
+      provide: 'ProjectService',
+      useExisting: ProjectService,
+    },
+  ],
   exports: [SprintService],
 })
 export class SprintModule {}

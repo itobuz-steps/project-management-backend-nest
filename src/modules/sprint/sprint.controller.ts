@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
   Put,
-  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +18,8 @@ import { RemoveTaskFromSprintDto } from './dto/remove-task-from-sprint.dto';
 import { AddTasksToSprintDto } from './dto/add-tasks-to-sprint.dto';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { ProjectRole } from '../project/type/project.types';
 
 @Controller('/project/:projectId/sprint')
 @UseGuards(IsAuthenticated)
@@ -29,11 +30,13 @@ export class SprintController {
   @Get()
   async getAllSprints(
     @Req() req: AuthenticatedRequest,
-    @Query('projectId') projectId?: string,
+    @Param('projectId') projectId: string,
   ) {
-    const result = projectId
-      ? await this.sprintService.getSprintsByProjectId(req.user._id, projectId)
-      : await this.sprintService.getAllSprints();
+    const result = await this.sprintService.getSprintsByProjectId(
+      req.user._id,
+      projectId,
+      req.user.role,
+    );
 
     return {
       success: true,
@@ -49,6 +52,7 @@ export class SprintController {
     const sprint = await this.sprintService.getSprintById(
       req.user._id,
       sprintId,
+      req.user.role,
     );
 
     return {
@@ -58,6 +62,7 @@ export class SprintController {
   }
 
   @Post()
+  @Roles(ProjectRole.ADMIN)
   async createSprint(
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateSprintDto,
@@ -70,6 +75,7 @@ export class SprintController {
   }
 
   @Put(':sprintId')
+  @Roles(ProjectRole.ADMIN)
   async updateSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
@@ -87,6 +93,7 @@ export class SprintController {
   }
 
   @Delete(':sprintId')
+  @Roles(ProjectRole.ADMIN)
   async deleteSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
@@ -99,6 +106,7 @@ export class SprintController {
   }
 
   @Patch(':sprintId/add-tasks')
+  @Roles(ProjectRole.ADMIN)
   async addTasksIntoSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
@@ -116,6 +124,7 @@ export class SprintController {
   }
 
   @Patch(':sprintId/remove-task')
+  @Roles(ProjectRole.ADMIN)
   async removeTaskFromSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,

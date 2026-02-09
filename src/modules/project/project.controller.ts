@@ -15,15 +15,17 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import type { AuthenticatedRequest } from 'src/type/common.type';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
 @Controller('project')
+@ApiBearerAuth()
 @UseGuards(IsAuthenticated)
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 
   @Get()
   async getAllProjects(@Req() req: AuthenticatedRequest) {
-    return this.projectService.getAllProjects(req.user._id);
+    return this.projectService.getAllProjects(req.user._id, req.user.role);
   }
 
   @Get('user-projects')
@@ -34,19 +36,23 @@ export class ProjectController {
     };
   }
 
-  @Get(':id')
+  @Get(':projectId')
   async getProjectById(
     @Req() req: AuthenticatedRequest,
-    @Param('id') projectId: string,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.projectService.getProjectById(req.user._id, projectId),
+      result: await this.projectService.getProjectById(
+        req.user._id,
+        projectId,
+        req.user.role,
+      ),
     };
   }
 
-  @Get('/:id/get-user/')
-  async getUserByProjectId(@Param('id') projectId: string) {
+  @Get('/:projectId/get-user/')
+  async getUserByProjectId(@Param('projectId') projectId: string) {
     const project = await this.projectService.getUserByProjectId(projectId);
 
     const users = project.members.map((member) => member.user);
@@ -64,14 +70,18 @@ export class ProjectController {
   ) {
     return {
       success: true,
-      result: await this.projectService.createProject(req.user._id, dto),
+      result: await this.projectService.createProject(
+        req.user._id,
+        req.user.role,
+        dto,
+      ),
       message: 'Project created successfully',
     };
   }
 
-  @Put(':id')
+  @Put(':projectId')
   async updateProject(
-    @Param('id') projectId: string,
+    @Param('projectId') projectId: string,
     @Req() req: AuthenticatedRequest,
     @Body() dto: UpdateProjectDto,
   ) {
@@ -79,6 +89,7 @@ export class ProjectController {
       success: true,
       result: await this.projectService.updateProject(
         req.user._id,
+        req.user.role,
         projectId,
         dto,
       ),
@@ -86,14 +97,18 @@ export class ProjectController {
     };
   }
 
-  @Delete(':id')
+  @Delete(':projectId')
   async deleteProject(
-    @Param('id') projectId: string,
+    @Param('projectId') projectId: string,
     @Req() req: AuthenticatedRequest,
   ) {
     return {
       success: true,
-      result: await this.projectService.deleteProject(req.user._id, projectId),
+      result: await this.projectService.deleteProject(
+        req.user._id,
+        req.user.role,
+        projectId,
+      ),
       message: 'Project successfully deleted',
     };
   }

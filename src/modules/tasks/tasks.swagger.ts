@@ -6,20 +6,10 @@ import {
   ApiBody,
   ApiQuery,
 } from '@nestjs/swagger';
-import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TASK_PRIORITIES } from 'src/constants/task.constants';
-import { Task } from './entities/task.entity';
 
-// Common response schemas
-const SuccessResponse = (description: string) => ({
-  type: 'object',
-  properties: {
-    success: { type: 'boolean', example: true },
-    result: { type: 'object', description },
-  },
-});
-
+// Common error response schema
 const ErrorResponse = {
   type: 'object',
   properties: {
@@ -37,16 +27,42 @@ const TaskIdParam = () =>
 
 export function CreateTaskDocs() {
   return applyDecorators(
-    ApiOperation({ summary: 'Create a new task' }),
-    ApiBody({ type: CreateTaskDto }),
+    ApiOperation({
+      summary: 'Create a new task',
+      description:
+        'Creates a new task in the specified project. Supports file attachments (max 10 files).',
+    }),
+    ApiParam({
+      name: 'projectId',
+      description: 'Project ID',
+      example: '507f1f77bcf86cd799439011',
+    }),
     ApiResponse({
       status: 201,
       description: 'Task created successfully',
-      schema: SuccessResponse('Created task object'),
+      schema: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          result: {
+            type: 'object',
+          },
+        },
+      },
     }),
     ApiResponse({
       status: 400,
       description: 'Bad request - validation failed',
+      schema: ErrorResponse,
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
+      schema: ErrorResponse,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Project not found',
       schema: ErrorResponse,
     }),
   );
@@ -57,14 +73,12 @@ export function GetAllTasksDocs() {
     ApiOperation({
       summary: 'Get all tasks',
       description:
-        'Retrieve all tasks with optional filtering, searching, and sorting capabilities',
+        'Retrieve all tasks for the specified project with optional filtering, searching, and sorting capabilities',
     }),
-    ApiQuery({
+    ApiParam({
       name: 'projectId',
-      required: false,
-      description: 'Filter tasks by project ID',
+      description: 'Project ID',
       example: '507f1f77bcf86cd799439011',
-      type: String,
     }),
     ApiQuery({
       name: 'searchQuery',
@@ -77,7 +91,14 @@ export function GetAllTasksDocs() {
       name: 'sortBy',
       required: false,
       description: 'Field to sort by',
-      enum: [...Object.keys(Task), 'createdAt', 'updatedAt'],
+      enum: [
+        'title',
+        'status',
+        'priority',
+        'dueDate',
+        'createdAt',
+        'updatedAt',
+      ],
       example: 'createdAt',
     }),
     ApiQuery({
@@ -104,10 +125,9 @@ export function GetAllTasksDocs() {
     ApiQuery({
       name: 'tags',
       required: false,
-      description: 'Filter tasks by tags',
-      example: 'frontend',
+      description: 'Filter tasks by tags (comma-separated)',
+      example: 'frontend,authentication',
       type: String,
-      isArray: true,
     }),
     ApiQuery({
       name: 'assignee',
@@ -123,7 +143,12 @@ export function GetAllTasksDocs() {
         type: 'object',
         properties: {
           success: { type: 'boolean', example: true },
-          result: { type: 'array', items: { type: 'object' } },
+          result: {
+            type: 'array',
+            items: {
+              type: 'object',
+            },
+          },
         },
       },
     }),
@@ -132,17 +157,48 @@ export function GetAllTasksDocs() {
       description: 'Bad request - invalid query parameters',
       schema: ErrorResponse,
     }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
+      schema: ErrorResponse,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Project not found',
+      schema: ErrorResponse,
+    }),
   );
 }
 
 export function GetTaskByIdDocs() {
   return applyDecorators(
-    ApiOperation({ summary: 'Get a task by ID' }),
+    ApiOperation({
+      summary: 'Get a task by ID',
+      description: 'Retrieve detailed information about a specific task',
+    }),
+    ApiParam({
+      name: 'projectId',
+      description: 'Project ID',
+      example: '507f1f77bcf86cd799439011',
+    }),
     TaskIdParam(),
     ApiResponse({
       status: 200,
-      description: 'Task found',
-      schema: SuccessResponse('Task object'),
+      description: 'Task found successfully',
+      schema: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          result: {
+            type: 'object',
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
+      schema: ErrorResponse,
     }),
     ApiResponse({
       status: 404,
@@ -154,22 +210,38 @@ export function GetTaskByIdDocs() {
 
 export function UpdateTaskDocs() {
   return applyDecorators(
-    ApiOperation({ summary: 'Update a task' }),
+    ApiOperation({
+      summary: 'Update a task',
+      description:
+        'Update specific fields of an existing task. All fields are optional.',
+    }),
+    ApiParam({
+      name: 'projectId',
+      description: 'Project ID',
+      example: '507f1f77bcf86cd799439011',
+    }),
     TaskIdParam(),
     ApiBody({ type: UpdateTaskDto }),
     ApiResponse({
       status: 200,
       description: 'Task updated successfully',
-      schema: SuccessResponse('Updated task object'),
-    }),
-    ApiResponse({
-      status: 404,
-      description: 'Task not found',
-      schema: ErrorResponse,
+      schema: {
+        type: 'object',
+      },
     }),
     ApiResponse({
       status: 400,
       description: 'Bad request - validation failed',
+      schema: ErrorResponse,
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
+      schema: ErrorResponse,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Task not found',
       schema: ErrorResponse,
     }),
   );
@@ -177,12 +249,26 @@ export function UpdateTaskDocs() {
 
 export function DeleteTaskDocs() {
   return applyDecorators(
-    ApiOperation({ summary: 'Delete a task' }),
+    ApiOperation({
+      summary: 'Delete a task',
+    }),
+    ApiParam({
+      name: 'projectId',
+      description: 'Project ID',
+      example: '507f1f77bcf86cd799439011',
+    }),
     TaskIdParam(),
     ApiResponse({
       status: 200,
       description: 'Task deleted successfully',
-      schema: SuccessResponse('Deleted task object'),
+      schema: {
+        type: 'object',
+      },
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
+      schema: ErrorResponse,
     }),
     ApiResponse({
       status: 404,

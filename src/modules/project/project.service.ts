@@ -11,6 +11,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../notification/services/notification-push.service';
+import { Role } from '../auth/types/auth.types';
 
 @Injectable()
 export class ProjectService {
@@ -21,7 +22,11 @@ export class ProjectService {
     private readonly notificationPushService: NotificationPushService,
   ) {}
 
-  async getAllProjects(userId: ObjectIdLike): Promise<Project[]> {
+  async getAllProjects(userId: ObjectIdLike, role: Role): Promise<Project[]> {
+    if (role === Role.SUPERADMIN) {
+      return this.projectModel.find();
+    }
+
     return this.projectModel.find({
       'members.user': userId,
     });
@@ -30,11 +35,18 @@ export class ProjectService {
   async getProjectById(
     userId: ObjectIdLike,
     projectId: ObjectIdLike,
+    role: Role,
   ): Promise<Project> {
-    const project = await this.projectModel.findOne({
-      _id: projectId,
-      'members.user': userId,
-    });
+    let project: Project | null;
+
+    if (role === Role.SUPERADMIN) {
+      project = await this.projectModel.findById(projectId);
+    } else {
+      project = await this.projectModel.findOne({
+        _id: projectId,
+        'members.user': userId,
+      });
+    }
 
     if (!project) {
       throw new NotFoundException('Project by given id not found');
@@ -63,8 +75,13 @@ export class ProjectService {
 
   async createProject(
     userId: ObjectIdLike,
+    role: Role,
     dto: CreateProjectDto,
   ): Promise<Project> {
+    if (role !== Role.SUPERADMIN) {
+      throw new ForbiddenException('Only superadmin can create projects');
+    }
+
     const prefix = dto.prefix ?? generateProjectPrefix(dto.name);
 
     const project = new this.projectModel({
@@ -87,9 +104,14 @@ export class ProjectService {
 
   async updateProject(
     userId: ObjectIdLike,
+    role: Role,
     projectId: ObjectIdLike,
     update: UpdateProjectDto,
   ): Promise<Project> {
+    if (role !== Role.SUPERADMIN) {
+      throw new ForbiddenException('Only superadmin can update projects');
+    }
+
     const updatePayload: Record<string, any> = { ...update };
 
     if (update.name) {
@@ -128,8 +150,13 @@ export class ProjectService {
 
   async deleteProject(
     userId: ObjectIdLike,
+    role: Role,
     projectId: ObjectIdLike,
   ): Promise<Project> {
+    if (role !== Role.SUPERADMIN) {
+      throw new ForbiddenException('Only superadmin can delete projects');
+    }
+
     const project = await this.projectModel.findOne({
       _id: projectId,
       members: {

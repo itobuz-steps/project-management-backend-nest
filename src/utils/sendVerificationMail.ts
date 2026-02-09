@@ -63,4 +63,27 @@ export class MailService {
       throw error;
     }
   }
+
+  async sendTaskOverdueMail(
+    email: string,
+    taskTitle: string,
+    projectName: string,
+  ): Promise<void> {
+    try {
+      const mailSender = new MailSender(this.configService);
+      await mailSender.sendMail(
+        email,
+        `Task Overdue - ${projectName}`,
+        `
+        <h3>Task Overdue</h3>
+        <p>Your task <b>${taskTitle}</b> in project <b>${projectName}</b> is overdue.</p>
+        <p>Please take action.</p>
+        `,
+      );
+      return;
+    } catch (error) {
+      this.logger.error(`Failed to send task overdue email to ${email}`, error);
+      throw error;
+    }
+  }
 }

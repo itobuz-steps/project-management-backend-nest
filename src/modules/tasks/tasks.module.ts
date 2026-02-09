@@ -7,7 +7,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { NotificationModule } from '../notification/notification.module';
-import { ProjectService } from '../project/project.service';
+import { ProjectService } from '../project/services/project.service';
 @Module({
   controllers: [TasksController],
   providers: [

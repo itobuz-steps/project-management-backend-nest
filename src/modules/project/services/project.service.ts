@@ -5,13 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Project } from './schema/project.schema';
-import { CreateProjectDto } from './dto/create-project.dto';
-import { UpdateProjectDto } from './dto/update-project.dto';
+import { Project } from '../schema/project.schema';
+import { CreateProjectDto } from '../dto/create-project.dto';
+import { UpdateProjectDto } from '../dto/update-project.dto';
 import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 import { ObjectIdLike } from 'src/type/common.type';
-import { NotificationPushService } from '../notification/services/notification-push.service';
-import { Role } from '../auth/types/auth.types';
+import { NotificationPushService } from '../../notification/services/notification-push.service';
+import { Role } from '../../auth/types/auth.types';
 
 @Injectable()
 export class ProjectService {

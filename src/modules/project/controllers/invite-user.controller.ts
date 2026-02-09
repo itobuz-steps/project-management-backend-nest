@@ -8,15 +8,15 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import { IsAuthenticated } from '../../middlewares/isAuthenticated';
-import type { UserDocument } from '../auth/schemas/user.schema';
-import { InviteUserService } from './invite-user.service';
-import { InviteUserDto } from './dto/invite-user.dto';
+import { IsAuthenticated } from '../../../middlewares/isAuthenticated';
+import type { UserDocument } from '../../auth/schemas/user.schema';
+import { InviteUserService } from '../services/invite-user.service';
+import { InviteUserDto } from '../dto/invite-user.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 
 type AuthenticatedRequest = Request & { user?: UserDocument };
 
-@Controller('projects/invites')
+@Controller('projects/:projectId/invites')
 @ApiBearerAuth()
 export class InviteUserController {
   constructor(private readonly inviteUserService: InviteUserService) {}

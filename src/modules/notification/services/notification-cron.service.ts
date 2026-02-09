@@ -35,11 +35,11 @@ export class NotificationCronService {
     const now = new Date();
 
     try {
-      const overdueTasks = await this.taskModel.find({
-        dueDate: { $lt: now },
-      });
+      const overdueTasks = this.taskModel
+        .find({ dueDate: { $lt: now } })
+        .cursor();
 
-      for (const task of overdueTasks) {
+      for await (const task of overdueTasks) {
         const project = await this.projectModel.findById(task.projectId);
         if (!project) continue;
 

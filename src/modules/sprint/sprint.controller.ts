@@ -32,11 +32,11 @@ export class SprintController {
     @Req() req: AuthenticatedRequest,
     @Param('projectId') projectId: string,
   ) {
-    const result = await this.sprintService.getSprintsByProjectId(
-      req.user._id,
+    const result = await this.sprintService.getSprintsByProjectId({
+      userId: req.user._id,
       projectId,
-      req.user.role,
-    );
+      role: req.user.role,
+    });
 
     return {
       success: true,
@@ -49,11 +49,11 @@ export class SprintController {
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
   ) {
-    const sprint = await this.sprintService.getSprintById(
-      req.user._id,
+    const sprint = await this.sprintService.getSprintById({
+      userId: req.user._id,
       sprintId,
-      req.user.role,
-    );
+      role: req.user.role,
+    });
 
     return {
       success: true,
@@ -70,12 +70,11 @@ export class SprintController {
   ) {
     return {
       success: true,
-      result: await this.sprintService.createSprint(
-        req.user._id,
+      result: await this.sprintService.createSprint(dto, {
+        userId: req.user._id,
         projectId,
-        dto,
-        req.user.role,
-      ),
+        role: req.user.role,
+      }),
       message: 'Sprint created successfully',
     };
   }
@@ -90,13 +89,12 @@ export class SprintController {
   ) {
     return {
       success: true,
-      result: await this.sprintService.updateSprint(
-        req.user._id,
+      result: await this.sprintService.updateSprint(dto, {
+        userId: req.user._id,
         projectId,
         sprintId,
-        dto,
-        req.user.role,
-      ),
+        role: req.user.role,
+      }),
       message: 'Sprint updated successfully',
     };
   }
@@ -110,12 +108,12 @@ export class SprintController {
   ) {
     return {
       success: true,
-      result: await this.sprintService.deleteSprint(
-        req.user._id,
+      result: await this.sprintService.deleteSprint({
+        userId: req.user._id,
         projectId,
         sprintId,
-        req.user.role,
-      ),
+        role: req.user.role,
+      }),
       message: 'Sprint successfully deleted',
     };
   }
@@ -130,13 +128,12 @@ export class SprintController {
   ) {
     return {
       success: true,
-      result: await this.sprintService.addTasksIntoSprint(
-        req.user._id,
+      result: await this.sprintService.addTasksIntoSprint(dto.tasks, {
+        userId: req.user._id,
         projectId,
         sprintId,
-        dto.tasks,
-        req.user.role,
-      ),
+        role: req.user.role,
+      }),
       message: 'Tasks added into sprint successfully',
     };
   }
@@ -151,13 +148,12 @@ export class SprintController {
   ) {
     return {
       success: true,
-      result: await this.sprintService.removeTaskFromSprint(
-        req.user._id,
+      result: await this.sprintService.removeTaskFromSprint(dto.task, {
+        userId: req.user._id,
         projectId,
         sprintId,
-        dto.task,
-        req.user.role,
-      ),
+        role: req.user.role,
+      }),
       message: 'Sprint tasks updated successfully',
     };
   }

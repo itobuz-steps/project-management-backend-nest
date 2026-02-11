@@ -4,10 +4,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { Project, ProjectSchema } from './schema/project.schema';
-import { ProjectService } from './project.service';
-import { ProjectController } from './project.controller';
-import { InviteUserController } from './invite-user.controller';
-import { InviteUserService } from './invite-user.service';
+import { ProjectService } from '../project/services/project.service';
+import { ProjectController } from './controllers/project.controller';
+import { InviteUserController } from './controllers/invite-user.controller';
+import { InviteUserService } from './services/invite-user.service';
 import { NotificationModule } from '../notification/notification.module';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 

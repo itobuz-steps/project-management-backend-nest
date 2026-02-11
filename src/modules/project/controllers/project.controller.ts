@@ -10,9 +10,9 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
-import { ProjectService } from './project.service';
-import { CreateProjectDto } from './dto/create-project.dto';
-import { UpdateProjectDto } from './dto/update-project.dto';
+import { ProjectService } from '../services/project.service';
+import { CreateProjectDto } from '../dto/create-project.dto';
+import { UpdateProjectDto } from '../dto/update-project.dto';
 import type { AuthenticatedRequest } from 'src/type/common.type';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import { ApiBearerAuth } from '@nestjs/swagger';

@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Types } from 'mongoose';
-import type { ProjectService } from 'src/modules/project/project.service';
+import type { ProjectService } from 'src/modules/project/services/project.service';
 import { ProjectRole } from 'src/modules/project/type/project.types';
 import { AuthenticatedRequest } from 'src/type/common.type';
 import { ROLES_KEY } from '../decorators/roles.decorator';
@@ -32,7 +32,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const projectId = request?.params?.projectId as string;
+    const { projectId } = (request.params ?? {}) as { projectId?: string };
 
     if (!projectId) {
       throw new ForbiddenException(

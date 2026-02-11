@@ -4,13 +4,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import { Sprint } from './schema/sprint.schema';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { CreateSprintDto } from './dto/create-sprint.dto';
 import { UpdateSprintDto } from './dto/update-sprint.dto';
 import { NotificationPushService } from '../notification/services/notification-push.service';
+import { getProjectWithAccess } from 'src/utils/project-access.util';
+import {
+  ProjectAccessParams,
+  SprintIdParams,
+  SprintAccessParams,
+} from './type/sprint.types';
 
 @Injectable()
 export class SprintService {
@@ -27,19 +33,19 @@ export class SprintService {
     return this.sprintModel.find();
   }
 
-  async getSprintById(
-    userId: ObjectIdLike,
-    sprintId: ObjectIdLike,
-  ): Promise<Sprint> {
+  async getSprintById(params: SprintAccessParams): Promise<Sprint> {
+    const { userId, sprintId, role } = params;
+
     const sprint = await this.sprintModel.findById(sprintId);
 
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: sprint.projectId,
-      'members.user': userId,
+    const project = await getProjectWithAccess(this.projectModel, {
+      projectId: sprint.projectId,
+      userId,
+      role,
     });
 
     if (!project) {
@@ -49,32 +55,32 @@ export class SprintService {
     return sprint;
   }
 
-  async getSprintsByProjectId(
-    userId: ObjectIdLike,
-    projectId: ObjectIdLike,
-  ): Promise<Sprint[]> {
-    const projectObjectId =
-      typeof projectId === 'string' ? new Types.ObjectId(projectId) : projectId;
+  async getSprintsByProjectId(params: ProjectAccessParams): Promise<Sprint[]> {
+    const { userId, projectId, role } = params;
 
-    const project = await this.projectModel.findOne({
-      _id: projectObjectId,
-      'members.user': userId,
+    const project = await getProjectWithAccess(this.projectModel, {
+      projectId,
+      userId,
+      role,
     });
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
     }
 
-    return this.sprintModel.find({ projectId: projectObjectId });
+    return this.sprintModel.find({ projectId });
   }
 
   async createSprint(
-    userId: ObjectIdLike,
     dto: CreateSprintDto,
+    params: ProjectAccessParams,
   ): Promise<Sprint> {
-    const project = await this.projectModel.findOne({
-      _id: dto.projectId,
-      'members.user': userId,
+    const { userId, projectId, role } = params;
+
+    const project = await getProjectWithAccess(this.projectModel, {
+      projectId,
+      userId,
+      role,
     });
 
     if (!project) {
@@ -83,6 +89,7 @@ export class SprintService {
 
     const sprint = new this.sprintModel({
       ...dto,
+      projectId,
       key: `${project.prefix}-sprint-${project.sprintCount + 1}`,
     });
 
@@ -104,19 +111,21 @@ export class SprintService {
   }
 
   async updateSprint(
-    userId: ObjectIdLike,
-    sprintId: ObjectIdLike,
     update: UpdateSprintDto,
+    params: SprintIdParams,
   ): Promise<Sprint> {
+    const { userId, projectId, sprintId, role } = params;
+
     const sprint = await this.sprintModel.findById(sprintId);
 
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: sprint.projectId,
-      'members.user': userId,
+    const project = await getProjectWithAccess(this.projectModel, {
+      projectId,
+      userId,
+      role,
     });
 
     if (!project) {
@@ -145,19 +154,19 @@ export class SprintService {
     return updatedSprint;
   }
 
-  async deleteSprint(
-    userId: ObjectIdLike,
-    sprintId: ObjectIdLike,
-  ): Promise<Sprint> {
+  async deleteSprint(params: SprintIdParams): Promise<Sprint> {
+    const { userId, projectId, sprintId, role } = params;
+
     const sprint = await this.sprintModel.findById(sprintId);
 
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.exists({
-      _id: sprint.projectId,
-      'members.user': userId,
+    const project = await getProjectWithAccess(this.projectModel, {
+      projectId,
+      userId,
+      role,
     });
 
     if (!project) {
@@ -179,19 +188,21 @@ export class SprintService {
   }
 
   async addTasksIntoSprint(
-    userId: ObjectIdLike,
-    sprintId: ObjectIdLike,
     tasks: ObjectIdLike[],
+    params: SprintIdParams,
   ): Promise<Sprint> {
+    const { userId, projectId, sprintId, role } = params;
+
     const sprint = await this.sprintModel.findById(sprintId);
 
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: sprint.projectId,
-      'members.user': userId,
+    const project = await getProjectWithAccess(this.projectModel, {
+      projectId,
+      userId,
+      role,
     });
 
     if (!project) {
@@ -224,19 +235,21 @@ export class SprintService {
   }
 
   async removeTaskFromSprint(
-    userId: ObjectIdLike,
-    sprintId: ObjectIdLike,
     taskId: ObjectIdLike,
+    params: SprintIdParams,
   ): Promise<Sprint> {
+    const { userId, projectId, sprintId, role } = params;
+
     const sprint = await this.sprintModel.findById(sprintId);
 
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: sprint.projectId,
-      'members.user': userId,
+    const project = await getProjectWithAccess(this.projectModel, {
+      projectId,
+      userId,
+      role,
     });
 
     if (!project) {

@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
   Put,
-  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +18,8 @@ import { RemoveTaskFromSprintDto } from './dto/remove-task-from-sprint.dto';
 import { AddTasksToSprintDto } from './dto/add-tasks-to-sprint.dto';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { ProjectRole } from '../project/type/project.types';
 
 @Controller('/project/:projectId/sprint')
 @UseGuards(IsAuthenticated)
@@ -29,11 +30,13 @@ export class SprintController {
   @Get()
   async getAllSprints(
     @Req() req: AuthenticatedRequest,
-    @Query('projectId') projectId?: string,
+    @Param('projectId') projectId: string,
   ) {
-    const result = projectId
-      ? await this.sprintService.getSprintsByProjectId(req.user._id, projectId)
-      : await this.sprintService.getAllSprints();
+    const result = await this.sprintService.getSprintsByProjectId({
+      userId: req.user._id,
+      projectId,
+      role: req.user.role,
+    });
 
     return {
       success: true,
@@ -46,10 +49,11 @@ export class SprintController {
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
   ) {
-    const sprint = await this.sprintService.getSprintById(
-      req.user._id,
+    const sprint = await this.sprintService.getSprintById({
+      userId: req.user._id,
       sprintId,
-    );
+      role: req.user.role,
+    });
 
     return {
       success: true,
@@ -58,76 +62,98 @@ export class SprintController {
   }
 
   @Post()
+  @Roles(ProjectRole.ADMIN)
   async createSprint(
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.sprintService.createSprint(req.user._id, dto),
+      result: await this.sprintService.createSprint(dto, {
+        userId: req.user._id,
+        projectId,
+        role: req.user.role,
+      }),
       message: 'Sprint created successfully',
     };
   }
 
   @Put(':sprintId')
+  @Roles(ProjectRole.ADMIN)
   async updateSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
     @Body() dto: UpdateSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.sprintService.updateSprint(
-        req.user._id,
+      result: await this.sprintService.updateSprint(dto, {
+        userId: req.user._id,
+        projectId,
         sprintId,
-        dto,
-      ),
+        role: req.user.role,
+      }),
       message: 'Sprint updated successfully',
     };
   }
 
   @Delete(':sprintId')
+  @Roles(ProjectRole.ADMIN)
   async deleteSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.sprintService.deleteSprint(req.user._id, sprintId),
+      result: await this.sprintService.deleteSprint({
+        userId: req.user._id,
+        projectId,
+        sprintId,
+        role: req.user.role,
+      }),
       message: 'Sprint successfully deleted',
     };
   }
 
   @Patch(':sprintId/add-tasks')
+  @Roles(ProjectRole.ADMIN)
   async addTasksIntoSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
     @Body() dto: AddTasksToSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.sprintService.addTasksIntoSprint(
-        req.user._id,
+      result: await this.sprintService.addTasksIntoSprint(dto.tasks, {
+        userId: req.user._id,
+        projectId,
         sprintId,
-        dto.tasks,
-      ),
+        role: req.user.role,
+      }),
       message: 'Tasks added into sprint successfully',
     };
   }
 
   @Patch(':sprintId/remove-task')
+  @Roles(ProjectRole.ADMIN)
   async removeTaskFromSprint(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
     @Body() dto: RemoveTaskFromSprintDto,
+    @Param('projectId') projectId: string,
   ) {
     return {
       success: true,
-      result: await this.sprintService.removeTaskFromSprint(
-        req.user._id,
+      result: await this.sprintService.removeTaskFromSprint(dto.task, {
+        userId: req.user._id,
+        projectId,
         sprintId,
-        dto.task,
-      ),
+        role: req.user.role,
+      }),
       message: 'Sprint tasks updated successfully',
     };
   }

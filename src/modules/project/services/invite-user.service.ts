@@ -30,8 +30,8 @@ export class InviteUserService {
     private readonly configService: ConfigService<AppConfig>,
   ) {}
 
-  async inviteUsers(dto: InviteUserDto) {
-    const { email, projectId } = dto;
+  async inviteUsers(projectId: string, dto: InviteUserDto) {
+    const { email } = dto;
 
     const project = await this.projectModel.findById(projectId);
     if (!project) {

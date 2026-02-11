@@ -12,12 +12,26 @@ import { SprintModule } from './modules/sprint/sprint.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { join } from 'path';
+import { ServeStaticModule } from '@nestjs/serve-static';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       load: [appConfig],
+    }),
+    ServeStaticModule.forRootAsync({
+      useFactory: () => {
+        const uploadsPath = join(__dirname, '..', 'uploads');
+        console.log(`Serving static files from: ${uploadsPath}`);
+        return [
+          {
+            rootPath: uploadsPath,
+            serveRoot: '/uploads/',
+          },
+        ];
+      },
     }),
     DatabaseModule,
     ProjectModule,

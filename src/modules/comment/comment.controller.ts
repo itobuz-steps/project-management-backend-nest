@@ -23,7 +23,8 @@ import { multerOptionsForSingleFile } from 'src/config/multer.config';
 @UseGuards(IsAuthenticated)
 @ApiTags('comments')
 @ApiBearerAuth()
-@Controller('project/:projectId/tasks/:taskId/comments')
+// @Controller('project/:projectId/tasks/:taskId/comments')
+@Controller('tasks/:taskId/comments')
 export class CommentController {
   constructor(private readonly commentService: CommentService) {}
 

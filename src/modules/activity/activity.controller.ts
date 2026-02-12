@@ -3,13 +3,13 @@ import { ActivityService } from './services/activity.service';
 import { ActivityAction } from './type/activity.types';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 
-@Controller('activities')
+@Controller()
 @UseGuards(IsAuthenticated)
 export class ActivityController {
   constructor(private readonly activityService: ActivityService) {}
 
   // GET /activities — all activities across all tasks
-  @Get()
+  @Get('activities')
   async getAllActivities(
     @Query('page') page = 1,
     @Query('limit') limit = 20,
@@ -18,8 +18,8 @@ export class ActivityController {
     return this.activityService.getAllActivities(+page, +limit, { action });
   }
 
-  // GET /activities/task/:taskId — activities for a specific task
-  @Get('task/:taskId')
+  // GET /task/:taskId/activities — activities for a specific task
+  @Get('task/:taskId/activities')
   async getTaskTimeline(
     @Param('taskId') taskId: string,
     @Query('page') page = 1,

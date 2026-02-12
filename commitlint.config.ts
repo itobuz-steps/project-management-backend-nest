@@ -18,7 +18,7 @@ export default {
     {
       rules: {
         'validate-commit-message': ({ subject }: { subject: string }) => {
-          if (/^WMDT-\d+\s.*$/.test(subject)) {
+          if (/^PM-\d+\s.*$/.test(subject)) {
             return [true];
           }
 
@@ -26,9 +26,9 @@ export default {
             false,
             `${BOLD}${RED}❌ Invalid commit message format${RESET}\n\n` +
               `${BOLD}${CYAN}Expected pattern:${RESET}\n` +
-              `  '<type>: [WMDT-<ISSUE_ID>] <commit-message>'\n\n` +
+              `  '<type>: [PM-<ISSUE_ID>] <commit-message>'\n\n` +
               `${BOLD}${GREEN}Example:${RESET}\n` +
-              `  ${GREEN}feat: [WMDT-1234] add new login endpoint${RESET}\n\n` +
+              `  ${GREEN}feat: [PM-1234] add new login endpoint${RESET}\n\n` +
               `${YELLOW}Need help? Run:${RESET} ${BOLD}\`npm run commit\`${RESET}`,
           ];
         },

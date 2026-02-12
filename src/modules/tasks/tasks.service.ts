@@ -44,19 +44,19 @@ export class TasksService {
     await project.save();
 
     // Log task creation activity
-    await this.activityService.logTaskCreated(
-      newTask._id.toString(),
-      userId.toString(),
-      newTask.title,
-    );
+    await this.activityService.logTaskCreated({
+      taskId: newTask._id.toString(),
+      byUserId: userId.toString(),
+      taskTitle: newTask.title,
+    });
 
     // Log assignee activity if task is assigned
     if (newTask.assignee) {
-      await this.activityService.logAssigneeChange(
-        newTask._id.toString(),
-        userId.toString(),
-        newTask.assignee.toString(),
-      );
+      await this.activityService.logAssigneeChange({
+        taskId: newTask._id.toString(),
+        byUserId: userId.toString(),
+        newAssigneeId: newTask.assignee.toString(),
+      });
     }
 
     // Send notification to assignee if task is assigned
@@ -251,12 +251,12 @@ export class TasksService {
 
     // Log status change activity
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
-      await this.activityService.logStatusChange(
-        task._id.toString(),
-        userId.toString(),
-        task.status,
-        updateTaskDto.status,
-      );
+      await this.activityService.logStatusChange({
+        taskId: task._id.toString(),
+        byUserId: userId.toString(),
+        oldStatus: task.status,
+        newStatus: updateTaskDto.status,
+      });
     }
 
     // Log assignee change activity
@@ -264,12 +264,27 @@ export class TasksService {
       updateTaskDto.assignee &&
       task.assignee?.toString() !== updateTaskDto.assignee.toString()
     ) {
-      await this.activityService.logAssigneeChange(
-        task._id.toString(),
-        userId.toString(),
-        updateTaskDto.assignee.toString(),
-        task.assignee?.toString(),
-      );
+      const oldAssignee = task.assignee
+        ? await this.projectModel.db
+            .collection('users')
+            .findOne(
+              { _id: new mongoose.Types.ObjectId(task.assignee) },
+              { projection: { name: 1 } },
+            )
+        : null;
+      const newAssignee = await this.projectModel.db
+        .collection('users')
+        .findOne(
+          { _id: new mongoose.Types.ObjectId(updateTaskDto.assignee) },
+          { projection: { name: 1 } },
+        );
+
+      await this.activityService.logAssigneeChange({
+        taskId: task._id.toString(),
+        byUserId: userId.toString(),
+        newAssigneeId: (newAssignee?.name as string) || '',
+        oldAssigneeId: (oldAssignee?.name as string) || '',
+      });
     }
 
     // Log all other field changes
@@ -295,11 +310,11 @@ export class TasksService {
     }
 
     if (changes.length > 0) {
-      await this.activityService.logTaskUpdated(
-        task._id.toString(),
-        userId.toString(),
+      await this.activityService.logTaskUpdated({
+        taskId: task._id.toString(),
+        byUserId: userId.toString(),
         changes,
-      );
+      });
     }
 
     // Notify assignee if they were newly assigned

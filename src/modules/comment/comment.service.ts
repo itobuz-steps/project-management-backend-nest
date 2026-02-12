@@ -53,11 +53,11 @@ export class CommentService {
     }
 
     // Log comment added activity
-    await this.activityService.logCommentAdded(
-      taskId.toString(),
-      userId.toString(),
-      createCommentDto.message,
-    );
+    await this.activityService.logCommentAdded({
+      taskId: taskId.toString(),
+      byUserId: userId.toString(),
+      commentText: createCommentDto.message,
+    });
 
     // Notify assignee and reporter about new comment (excluding the commenter)
     const usersToNotify = new Set<string>();

@@ -1,0 +1,10 @@
+
+echo "\033[1;36m ===============🚀 STARTING CODE FORMAT FIX... ===============\033[0m"
+npm run format
+echo "\033[1;36m ---------------✅ CODE FORMATTING COMPLETED SUCCESSFULLY! ---------------\033[0m"
+
+echo  "\n\n\033[1;36m ===============🚀 STARTING CODE LINT FIX... ===============\033[0m"
+npm run lint
+echo  "\033[1;36m ---------------✅ CODE LINTING COMPLETED SUCCESSFULLY! ---------------\033[0m"
+
+git add .

@@ -141,6 +141,38 @@ export class TasksService {
       });
     }
 
+    // Populate assignee
+    pipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'assignee',
+        foreignField: '_id',
+        as: 'assignee',
+      },
+    });
+    pipeline.push({
+      $unwind: {
+        path: '$assignee',
+        preserveNullAndEmptyArrays: true,
+      },
+    });
+
+    // Populate reporter
+    pipeline.push({
+      $lookup: {
+        from: 'users',
+        localField: 'reporter',
+        foreignField: '_id',
+        as: 'reporter',
+      },
+    });
+    pipeline.push({
+      $unwind: {
+        path: '$reporter',
+        preserveNullAndEmptyArrays: true,
+      },
+    });
+
     const result =
       await this.taskModel.aggregate<HydratedDocument<Task>>(pipeline);
 
@@ -150,13 +182,18 @@ export class TasksService {
   async findAllAssignedTasks(userId: ObjectIdLike) {
     const result = await this.taskModel
       .find({ assignee: userId })
-      .populate('projectId', 'name');
+      .populate('projectId', 'name')
+      .populate('assignee', 'name email')
+      .populate('reporter', 'name email');
 
     return result;
   }
 
   async findOne(userId: ObjectIdLike, id: string) {
-    const task = await this.taskModel.findById(id);
+    const task = await this.taskModel
+      .findById(id)
+      .populate('assignee', 'name email')
+      .populate('reporter', 'name email');
 
     if (!task) {
       throw new Error('Task not found');
@@ -187,13 +224,12 @@ export class TasksService {
 
     await this.checkMembership(userId, task.projectId);
 
-    const updatedTask = await this.taskModel.findByIdAndUpdate(
-      id,
-      updateTaskDto,
-      {
+    const updatedTask = await this.taskModel
+      .findByIdAndUpdate(id, updateTaskDto, {
         new: true,
-      },
-    );
+      })
+      .populate('assignee', 'name email')
+      .populate('reporter', 'name email');
 
     // Notify assignee if they were newly assigned
     if (
@@ -265,7 +301,10 @@ export class TasksService {
       ),
     );
 
-    const deletedTask = await this.taskModel.findByIdAndDelete(id);
+    const deletedTask = await this.taskModel
+      .findByIdAndDelete(id)
+      .populate('assignee', 'name email')
+      .populate('reporter', 'name email');
 
     return deletedTask;
   }

@@ -7,7 +7,7 @@ import { SprintController } from './sprint.controller';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
-import { ProjectService } from '../project/project.service';
+import { ProjectService } from '../project/services/project.service';
 
 @Module({
   imports: [

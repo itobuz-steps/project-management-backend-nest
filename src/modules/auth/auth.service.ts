@@ -114,4 +114,19 @@ export class AuthService {
 
     return otp.value.toString();
   }
+
+  async updateProfile(
+    userId: ObjectIdLike,
+    updateData: { name?: string; profileImage?: string },
+  ): Promise<UserDocument> {
+    const user = await this.userModel.findByIdAndUpdate(userId, updateData, {
+      new: true,
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return user;
+  }
 }

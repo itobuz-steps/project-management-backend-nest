@@ -2,16 +2,21 @@ import {
   Body,
   Controller,
   Post,
+  Patch,
   BadRequestException,
   ConflictException,
   Req,
   UnauthorizedException,
   UseGuards,
   Get,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import type { Request } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { multerOptionsForSingleFile } from '../../config/multer.config';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
@@ -22,8 +27,9 @@ import { TokenGeneratorService } from 'src/utils/tokenGenerator';
 import type { AppConfig } from 'src/config/app.config';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { IsAuthenticated } from '../../middlewares/isAuthenticated';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 
 type AuthenticatedRequest = Request & { user?: UserDocument };
 
@@ -253,6 +259,50 @@ export class AuthController {
         _id: user._id,
         name: user.name,
         email: user.email,
+        profileImage: user.profileImage,
+      },
+    };
+  }
+
+  @Patch('profile')
+  @UseGuards(IsAuthenticated)
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({ type: UpdateProfileDto })
+  @UseInterceptors(FileInterceptor('profileImage', multerOptionsForSingleFile))
+  async updateProfile(
+    @Req() req: AuthenticatedRequest,
+    @Body() updateProfileDto: UpdateProfileDto,
+    @UploadedFile() profileImage: Express.Multer.File,
+  ) {
+    const user = req.user;
+
+    if (!user) {
+      throw new UnauthorizedException('Unauthorized');
+    }
+
+    const updateData: { name?: string; profileImage?: string } = {};
+
+    if (updateProfileDto.name) {
+      updateData.name = updateProfileDto.name;
+    }
+
+    if (profileImage) {
+      updateData.profileImage = profileImage.filename;
+    }
+
+    const updatedUser = await this.authService.updateProfile(
+      user._id,
+      updateData,
+    );
+
+    return {
+      success: true,
+      result: {
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        profileImage: updatedUser.profileImage,
       },
     };
   }

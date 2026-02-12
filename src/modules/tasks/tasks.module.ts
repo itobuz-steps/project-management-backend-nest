@@ -7,7 +7,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { NotificationModule } from '../notification/notification.module';
+import { ActivityModule } from '../activity/activity.module';
 import { ProjectService } from '../project/services/project.service';
+
 @Module({
   controllers: [TasksController],
   providers: [
@@ -24,6 +26,7 @@ import { ProjectService } from '../project/services/project.service';
     JwtModule.register({}),
     AuthModule,
     NotificationModule,
+    ActivityModule,
   ],
 })
 export class TasksModule {}

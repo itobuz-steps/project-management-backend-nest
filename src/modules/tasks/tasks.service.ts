@@ -12,12 +12,14 @@ import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { TaskFilters } from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
+import { ActivityService } from '../activity/services/activity.service';
 
 @Injectable()
 export class TasksService {
   constructor(
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
+    private readonly activityService: ActivityService,
     private readonly notificationPushService: NotificationPushService,
   ) {}
 
@@ -40,6 +42,22 @@ export class TasksService {
     project.lastKey += 1;
 
     await project.save();
+
+    // Log task creation activity
+    await this.activityService.logTaskCreated(
+      newTask._id.toString(),
+      userId.toString(),
+      newTask.title,
+    );
+
+    // Log assignee activity if task is assigned
+    if (newTask.assignee) {
+      await this.activityService.logAssigneeChange(
+        newTask._id.toString(),
+        userId.toString(),
+        newTask.assignee.toString(),
+      );
+    }
 
     // Send notification to assignee if task is assigned
     if (newTask.assignee && newTask.assignee.toString() !== userId.toString()) {
@@ -230,6 +248,59 @@ export class TasksService {
       })
       .populate('assignee', 'name email')
       .populate('reporter', 'name email');
+
+    // Log status change activity
+    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+      await this.activityService.logStatusChange(
+        task._id.toString(),
+        userId.toString(),
+        task.status,
+        updateTaskDto.status,
+      );
+    }
+
+    // Log assignee change activity
+    if (
+      updateTaskDto.assignee &&
+      task.assignee?.toString() !== updateTaskDto.assignee.toString()
+    ) {
+      await this.activityService.logAssigneeChange(
+        task._id.toString(),
+        userId.toString(),
+        updateTaskDto.assignee.toString(),
+        task.assignee?.toString(),
+      );
+    }
+
+    // Log all other field changes
+    const trackableFields: (keyof UpdateTaskDto)[] = [
+      'title',
+      'description',
+      'priority',
+      'type',
+      'tags',
+      'dueDate',
+      'storyPoint',
+    ];
+    const changes: { field: string; oldValue: string; newValue: string }[] = [];
+
+    for (const field of trackableFields) {
+      if (updateTaskDto[field] !== undefined) {
+        const oldVal = String(task[field] ?? '');
+        const newVal = String(updateTaskDto[field] ?? '');
+        if (oldVal !== newVal) {
+          changes.push({ field, oldValue: oldVal, newValue: newVal });
+        }
+      }
+    }
+
+    if (changes.length > 0) {
+      await this.activityService.logTaskUpdated(
+        task._id.toString(),
+        userId.toString(),
+        changes,
+      );
+    }
 
     // Notify assignee if they were newly assigned
     if (

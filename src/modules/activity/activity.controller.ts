@@ -18,8 +18,8 @@ export class ActivityController {
     return this.activityService.getAllActivities(+page, +limit, { action });
   }
 
-  // GET /task/:taskId/activities — activities for a specific task
-  @Get('task/:taskId/activities')
+  // GET /tasks/:taskId/activities — activities for a specific task
+  @Get('tasks/:taskId/activities')
   async getTaskTimeline(
     @Param('taskId') taskId: string,
     @Query('page') page = 1,

@@ -3,6 +3,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Activity } from '../schemas/activity.schemas';
 import { ActivityAction } from '../type/activity.types';
+import {
+  LogTaskCreatedParams,
+  LogTaskUpdatedParams,
+  LogStatusChangeParams,
+  LogCommentAddedParams,
+  LogAssigneeChangeParams,
+} from '../type/activity-params.types';
 
 @Injectable()
 export class ActivityService {
@@ -10,12 +17,8 @@ export class ActivityService {
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
   ) {}
 
-  // Log task creation
-  async logTaskCreated(
-    taskId: string,
-    byUserId: string,
-    taskTitle: string,
-  ): Promise<Activity> {
+  async logTaskCreated(params: LogTaskCreatedParams): Promise<Activity> {
+    const { taskId, byUserId, taskTitle } = params;
     return this.activityModel.create({
       task: new Types.ObjectId(taskId),
       action: ActivityAction.TASK_CREATED,
@@ -26,12 +29,8 @@ export class ActivityService {
     });
   }
 
-  // Log a generic task update (any fields)
-  async logTaskUpdated(
-    taskId: string,
-    byUserId: string,
-    changes: { field: string; oldValue: string; newValue: string }[],
-  ): Promise<Activity> {
+  async logTaskUpdated(params: LogTaskUpdatedParams): Promise<Activity> {
+    const { taskId, byUserId, changes } = params;
     const updatedFields: Record<string, { from: string; to: string }> = {};
     for (const c of changes) {
       updatedFields[c.field] = { from: c.oldValue, to: c.newValue };
@@ -45,13 +44,8 @@ export class ActivityService {
     });
   }
 
-  // Log a status change
-  async logStatusChange(
-    taskId: string,
-    byUserId: string,
-    oldStatus: string,
-    newStatus: string,
-  ): Promise<Activity> {
+  async logStatusChange(params: LogStatusChangeParams): Promise<Activity> {
+    const { taskId, byUserId, oldStatus, newStatus } = params;
     return this.activityModel.create({
       task: new Types.ObjectId(taskId),
       action: ActivityAction.STATUS_CHANGED,
@@ -62,12 +56,8 @@ export class ActivityService {
     });
   }
 
-  // Log a comment addition
-  async logCommentAdded(
-    taskId: string,
-    byUserId: string,
-    commentText: string,
-  ): Promise<Activity> {
+  async logCommentAdded(params: LogCommentAddedParams): Promise<Activity> {
+    const { taskId, byUserId, commentText } = params;
     return this.activityModel.create({
       task: new Types.ObjectId(taskId),
       action: ActivityAction.COMMENT_ADDED,
@@ -78,13 +68,8 @@ export class ActivityService {
     });
   }
 
-  // Log an assignee change
-  async logAssigneeChange(
-    taskId: string,
-    byUserId: string,
-    newAssigneeId: string,
-    oldAssigneeId?: string,
-  ): Promise<Activity> {
+  async logAssigneeChange(params: LogAssigneeChangeParams): Promise<Activity> {
+    const { taskId, byUserId, newAssigneeId, oldAssigneeId } = params;
     return this.activityModel.create({
       task: new Types.ObjectId(taskId),
       action: ActivityAction.ASSIGNEE_CHANGED,
@@ -96,7 +81,6 @@ export class ActivityService {
     });
   }
 
-  // Get full timeline for a task
   async getTaskTimeline(
     taskId: string,
     page = 1,
@@ -119,7 +103,6 @@ export class ActivityService {
     return { activities, total };
   }
 
-  // Get timeline filtered by action type
   async getTaskTimelineByAction(
     taskId: string,
     action: ActivityAction,
@@ -135,7 +118,6 @@ export class ActivityService {
       .exec();
   }
 
-  // Get all activities across all tasks
   async getAllActivities(
     page = 1,
     limit = 20,

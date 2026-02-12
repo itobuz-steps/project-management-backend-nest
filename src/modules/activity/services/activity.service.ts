@@ -142,7 +142,7 @@ export class ActivityService {
     filters: { action?: ActivityAction; projectId?: string } = {},
   ): Promise<{ activities: Activity[]; total: number }> {
     const skip = (page - 1) * limit;
-    const query: Record<string, any> = {};
+    const query: Record<string, string> = {};
 
     if (filters.action) {
       query.action = filters.action;

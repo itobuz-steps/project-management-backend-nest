@@ -69,16 +69,29 @@ export class ActivityService {
   }
 
   async logAssigneeChange(params: LogAssigneeChangeParams): Promise<Activity> {
-    const { taskId, byUserId, newAssigneeId, oldAssigneeId } = params;
-    return this.activityModel.create({
-      task: new Types.ObjectId(taskId),
-      action: ActivityAction.ASSIGNEE_CHANGED,
-      byUser: new Types.ObjectId(byUserId),
-      targetUser: new Types.ObjectId(newAssigneeId),
-      updatedFields: {
-        assignee: { from: oldAssigneeId ?? '', to: newAssigneeId },
-      },
-    });
+    const { taskId, byUserId, newAssigneeId } = params;
+
+    // Create activity data with or without targetUser
+    if (newAssigneeId) {
+      return this.activityModel.create({
+        task: new Types.ObjectId(taskId),
+        action: ActivityAction.ASSIGNEE_CHANGED,
+        byUser: new Types.ObjectId(byUserId),
+        targetUser: new Types.ObjectId(newAssigneeId),
+        updatedFields: {
+          assignee: { to: newAssigneeId },
+        },
+      });
+    } else {
+      return this.activityModel.create({
+        task: new Types.ObjectId(taskId),
+        action: ActivityAction.ASSIGNEE_CHANGED,
+        byUser: new Types.ObjectId(byUserId),
+        updatedFields: {
+          assignee: { to: '' },
+        },
+      });
+    }
   }
 
   async getTaskTimeline(

@@ -26,6 +26,6 @@ export interface LogCommentAddedParams {
 export interface LogAssigneeChangeParams {
   taskId: string;
   byUserId: string;
-  newAssigneeId: string;
-  oldAssigneeId?: string;
+  newAssigneeId?: string | null;
+  oldAssigneeId?: string | null;
 }

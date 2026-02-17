@@ -13,6 +13,7 @@ import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
+import { Role } from '../auth/types/auth.types';
 
 @Injectable()
 export class CommentService {
@@ -26,9 +27,10 @@ export class CommentService {
 
   async getCommentsByTaskId(
     userId: ObjectIdLike,
+    role: Role,
     taskId: ObjectIdLike,
   ): Promise<Comment[]> {
-    await this.checkMembership(userId, taskId);
+    await this.checkMembership(userId, role, taskId);
 
     return this.commentModel
       .find({ taskId })
@@ -37,10 +39,11 @@ export class CommentService {
 
   async create(
     userId: ObjectIdLike,
+    role: Role,
     taskId: ObjectIdLike,
     createCommentDto: CreateCommentDto,
   ): Promise<Comment> {
-    const task = await this.checkMembership(userId, taskId);
+    const task = await this.checkMembership(userId, role, taskId);
 
     const newComment = await this.commentModel.create({
       ...createCommentDto,
@@ -68,7 +71,7 @@ export class CommentService {
       usersToNotify.add(task.reporter.toString());
     }
 
-    await Promise.all(
+    Promise.all(
       Array.from(usersToNotify).map((notifyUserId) =>
         this.notificationPushService.pushNotificationToUser(notifyUserId, {
           title: `New Comment on "${task.title}"`,
@@ -77,13 +80,16 @@ export class CommentService {
           taskId: task._id,
         }),
       ),
-    );
+    ).catch((err) => {
+      console.error('Error sending notifications for new comment:', err);
+    });
 
     return newComment;
   }
 
   async update(
     userId: ObjectIdLike,
+    role: Role,
     commentId: ObjectIdLike,
     updateCommentDto: UpdateCommentDto,
   ): Promise<Comment | null> {
@@ -92,7 +98,10 @@ export class CommentService {
       throw new NotFoundException('Comment not found');
     }
 
-    if (comment.author.toString() !== userId.toString()) {
+    if (
+      comment.author.toString() !== userId.toString() &&
+      role !== Role.SUPERADMIN
+    ) {
       throw new UnauthorizedException(
         'User is not authorized to update this comment',
       );
@@ -105,6 +114,7 @@ export class CommentService {
 
   async remove(
     userId: ObjectIdLike,
+    role: Role,
     commentId: ObjectIdLike,
   ): Promise<Comment | null> {
     const comment = await this.commentModel.findById(commentId);
@@ -113,7 +123,10 @@ export class CommentService {
       throw new NotFoundException('Comment not found');
     }
 
-    if (comment.author.toString() !== userId.toString()) {
+    if (
+      comment.author.toString() !== userId.toString() &&
+      role !== Role.SUPERADMIN
+    ) {
       throw new UnauthorizedException(
         'User is not authorized to delete this comment',
       );
@@ -122,11 +135,19 @@ export class CommentService {
     return this.commentModel.findByIdAndDelete(commentId);
   }
 
-  async checkMembership(userId: ObjectIdLike, taskId: ObjectIdLike) {
+  async checkMembership(
+    userId: ObjectIdLike,
+    role: Role,
+    taskId: ObjectIdLike,
+  ) {
     const task = await this.taskModel.findById(taskId);
 
     if (!task) {
       throw new NotFoundException('Task not found');
+    }
+
+    if (role === Role.SUPERADMIN) {
+      return task;
     }
 
     const project = await this.projectModel.findOne({

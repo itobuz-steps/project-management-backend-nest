@@ -56,6 +56,7 @@ export class CommentController {
     }
     const result = await this.commentService.create(
       req.user._id,
+      req.user.role,
       taskId,
       createCommentDto,
     );
@@ -69,6 +70,7 @@ export class CommentController {
   ) {
     const result = await this.commentService.getCommentsByTaskId(
       req.user._id,
+      req.user.role,
       taskId,
     );
     return { success: true, result };
@@ -82,6 +84,7 @@ export class CommentController {
   ) {
     const result = await this.commentService.update(
       req.user._id,
+      req.user.role,
       id,
       updateCommentDto,
     );
@@ -90,7 +93,11 @@ export class CommentController {
 
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const result = await this.commentService.remove(req.user._id, id);
+    const result = await this.commentService.remove(
+      req.user._id,
+      req.user.role,
+      id,
+    );
     return { success: true, result, message: 'Comment deleted successfully' };
   }
 }

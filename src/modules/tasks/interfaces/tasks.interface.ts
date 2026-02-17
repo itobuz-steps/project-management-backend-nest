@@ -12,3 +12,13 @@ export interface TaskFilters {
   tags?: string[] | string;
   assignee?: ObjectIdLike;
 }
+
+export const TRACKABLE_TASK_FIELDS = [
+  'title',
+  'description',
+  'priority',
+  'type',
+  'tags',
+  'dueDate',
+  'storyPoint',
+] as const;

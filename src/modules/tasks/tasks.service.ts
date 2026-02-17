@@ -11,7 +11,10 @@ import { Task } from './entities/task.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
-import { TaskFilters } from './interfaces/tasks.interface';
+import {
+  TaskFilters,
+  TRACKABLE_TASK_FIELDS,
+} from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
 
@@ -255,18 +258,6 @@ export class TasksService {
     await this.checkMembership(userId, task.projectId);
 
     /**
-     * Helper → safely convert string → ObjectId | null | undefined
-     */
-    const toObjectIdOrNull = (
-      value?: string | null,
-    ): Types.ObjectId | null | undefined => {
-      if (value === undefined) return undefined;
-      if (!value) return null;
-
-      return Types.ObjectId.isValid(value) ? new Types.ObjectId(value) : null;
-    };
-
-    /**
      * Build safe update payload (DB shape, not DTO shape)
      */
     type UpdateDataType = Omit<UpdateTaskDto, 'assignee'> & {
@@ -275,7 +266,9 @@ export class TasksService {
 
     const updateData: UpdateDataType = {
       ...updateTaskDto,
-      assignee: toObjectIdOrNull(updateTaskDto.assignee),
+      assignee: updateTaskDto.assignee
+        ? new Types.ObjectId(updateTaskDto.assignee)
+        : null,
     };
 
     /**
@@ -309,14 +302,15 @@ export class TasksService {
         newStatus: updateTaskDto.status,
       });
     }
-    if (updateTaskDto.assignee !== undefined) {
+    if (updateTaskDto.assignee) {
       const oldAssigneeId = task.assignee?.toString() || null;
       const newAssigneeId = updateData.assignee?.toString() || null;
 
       if (oldAssigneeId !== newAssigneeId) {
         const newAssignee = updateData.assignee
           ? await this.projectModel.db.collection('users').findOne(
-              { _id: updateData.assignee }, // ✅ already ObjectId
+              { _id: updateData.assignee },
+
               { projection: { name: 1 } },
             )
           : null;
@@ -330,23 +324,16 @@ export class TasksService {
       }
     }
 
-    /**
-     * Track Other Field Changes
-     */
-    const trackableFields: (keyof UpdateTaskDto)[] = [
-      'title',
-      'description',
-      'priority',
-      'type',
-      'tags',
-      'dueDate',
-      'storyPoint',
-    ];
+    // Track Other Field Changes
+
+    const trackableFields = [
+      ...TRACKABLE_TASK_FIELDS,
+    ] as (keyof UpdateTaskDto)[];
 
     const changes: { field: string; oldValue: string; newValue: string }[] = [];
 
     for (const field of trackableFields) {
-      if (updateTaskDto[field] !== undefined) {
+      if (updateTaskDto[field]) {
         const oldVal = String(task[field] ?? '');
         const newVal = String(updateTaskDto[field] ?? '');
 
@@ -360,7 +347,7 @@ export class TasksService {
       }
     }
 
-    if (changes.length > 0) {
+    if (changes) {
       await this.activityService.logTaskUpdated({
         taskId: task._id.toString(),
         byUserId: userId.toString(),

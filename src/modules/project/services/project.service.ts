@@ -112,7 +112,7 @@ export class ProjectService {
       throw new ForbiddenException('Only superadmin can update projects');
     }
 
-    const updatePayload: Record<string, any> = { ...update };
+    const updatePayload = { ...update };
 
     if (update.name) {
       updatePayload.prefix = generateProjectPrefix(update.name);

@@ -11,6 +11,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { SprintModule } from './modules/sprint/sprint.module';
 import { CommentModule } from './modules/comment/comment.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { ActivityModule } from './modules/activity/activity.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
@@ -40,6 +41,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
     SprintModule,
     CommentModule,
     NotificationModule,
+    ActivityModule,
     ScheduleModule.forRoot(),
   ],
   controllers: [AppController],

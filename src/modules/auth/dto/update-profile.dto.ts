@@ -9,5 +9,5 @@ export class UpdateProfileDto {
 
   @ApiProperty({ type: 'string', format: 'binary', required: false })
   @IsOptional()
-  profileImage?: any;
+  profileImage?: string;
 }

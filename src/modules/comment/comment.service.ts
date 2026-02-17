@@ -12,6 +12,7 @@ import { Task } from '../tasks/entities/task.entity';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../notification/services/notification-push.service';
+import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
 
 @Injectable()
@@ -21,6 +22,7 @@ export class CommentService {
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
     private readonly notificationPushService: NotificationPushService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async getCommentsByTaskId(
@@ -52,6 +54,13 @@ export class CommentService {
     if (!task) {
       throw new NotFoundException('Task not found');
     }
+
+    // Log comment added activity
+    await this.activityService.logCommentAdded({
+      taskId: taskId.toString(),
+      byUserId: userId.toString(),
+      commentText: createCommentDto.message,
+    });
 
     // Notify assignee and reporter about new comment (excluding the commenter)
     const usersToNotify = new Set<string>();

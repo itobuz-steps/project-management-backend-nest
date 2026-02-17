@@ -131,6 +131,13 @@ export class TasksController {
     @Body() updateTaskDto: UpdateTaskDto,
     @Req() req: AuthenticatedRequest,
   ) {
+    console.log(
+      'CONTROLLER - Raw body received:',
+      JSON.stringify(updateTaskDto, null, 2),
+    );
+    console.log('CONTROLLER - Has assignee?', 'assignee' in updateTaskDto);
+    console.log('CONTROLLER - assignee value:', updateTaskDto.assignee);
+
     const result = await this.tasksService.update(
       req.user._id,
       req.user.role,

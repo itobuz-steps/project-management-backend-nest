@@ -5,13 +5,18 @@ import {
 } from '@nestjs/common';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { Types } from 'mongoose';
 import mongoose, { HydratedDocument, Model, PipelineStage } from 'mongoose';
 import { Task } from './entities/task.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
-import { TaskFilters } from './interfaces/tasks.interface';
+import {
+  TaskFilters,
+  TRACKABLE_TASK_FIELDS,
+} from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
+import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
 
 @Injectable()
@@ -19,6 +24,7 @@ export class TasksService {
   constructor(
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
+    private readonly activityService: ActivityService,
     private readonly notificationPushService: NotificationPushService,
   ) {}
 
@@ -29,8 +35,14 @@ export class TasksService {
       createTaskDto.projectId,
     );
 
+    // Prepare task data and filter out invalid assignee values
+    const taskData = { ...createTaskDto };
+    if (!taskData.assignee || taskData.assignee === '') {
+      delete taskData.assignee;
+    }
+
     const newTask = await this.taskModel.create({
-      ...createTaskDto,
+      ...taskData,
       reporter: userId,
       key: `${project.prefix}-${project.lastKey + 1}`,
     });
@@ -38,6 +50,22 @@ export class TasksService {
     project.lastKey += 1;
 
     await project.save();
+
+    // Log task creation activity
+    await this.activityService.logTaskCreated({
+      taskId: newTask._id.toString(),
+      byUserId: userId.toString(),
+      taskTitle: newTask.title,
+    });
+
+    // Log assignee activity if task is assigned
+    if (newTask.assignee) {
+      await this.activityService.logAssigneeChange({
+        taskId: newTask._id.toString(),
+        byUserId: userId.toString(),
+        newAssigneeId: newTask.assignee.toString(),
+      });
+    }
 
     // Send notification to assignee if task is assigned
     if (newTask.assignee && newTask.assignee.toString() !== userId.toString()) {
@@ -248,21 +276,114 @@ export class TasksService {
 
     await this.checkMembership(userId, role, task.projectId);
 
+    /**
+     * Build safe update payload (DB shape, not DTO shape)
+     */
+    type UpdateDataType = Omit<UpdateTaskDto, 'assignee'> & {
+      assignee?: Types.ObjectId | null;
+    };
+
+    const updateData: UpdateDataType = {
+      ...updateTaskDto,
+      assignee: updateTaskDto.assignee
+        ? new Types.ObjectId(updateTaskDto.assignee)
+        : null,
+    };
+
+    /**
+     * Remove undefined fields
+     */
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key as keyof UpdateDataType] === undefined) {
+        delete updateData[key as keyof UpdateDataType];
+      }
+    });
+
+    /**
+     * Perform Update
+     */
     const updatedTask = await this.taskModel
-      .findByIdAndUpdate(id, updateTaskDto, {
+      .findByIdAndUpdate(id, updateData, {
         new: true,
+        runValidators: true,
       })
       .populate('assignee', 'name email')
       .populate('reporter', 'name email');
 
-    // Notify assignee if they were newly assigned
+    /**
+     * Status Change Activity
+     */
+    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+      await this.activityService.logStatusChange({
+        taskId: task._id.toString(),
+        byUserId: userId.toString(),
+        oldStatus: task.status,
+        newStatus: updateTaskDto.status,
+      });
+    }
+    if (updateTaskDto.assignee) {
+      const oldAssigneeId = task.assignee?.toString() || null;
+      const newAssigneeId = updateData.assignee?.toString() || null;
+
+      if (oldAssigneeId !== newAssigneeId) {
+        const newAssignee = updateData.assignee
+          ? await this.projectModel.db.collection('users').findOne(
+              { _id: updateData.assignee },
+
+              { projection: { name: 1 } },
+            )
+          : null;
+        console.log('New Assignee Details:', newAssignee);
+
+        await this.activityService.logAssigneeChange({
+          taskId: task._id.toString(),
+          byUserId: userId.toString(),
+          newAssigneeId: updateData.assignee?.toString() ?? null,
+        });
+      }
+    }
+
+    // Track Other Field Changes
+
+    const trackableFields = [
+      ...TRACKABLE_TASK_FIELDS,
+    ] as (keyof UpdateTaskDto)[];
+
+    const changes: { field: string; oldValue: string; newValue: string }[] = [];
+
+    for (const field of trackableFields) {
+      if (updateTaskDto[field]) {
+        const oldVal = String(task[field] ?? '');
+        const newVal = String(updateTaskDto[field] ?? '');
+
+        if (oldVal !== newVal) {
+          changes.push({
+            field,
+            oldValue: oldVal,
+            newValue: newVal,
+          });
+        }
+      }
+    }
+
+    if (changes) {
+      await this.activityService.logTaskUpdated({
+        taskId: task._id.toString(),
+        byUserId: userId.toString(),
+        changes,
+      });
+    }
+
+    /**
+     * Notify New Assignee
+     */
     if (
-      updateTaskDto.assignee &&
-      task.assignee?.toString() !== updateTaskDto.assignee.toString() &&
-      updateTaskDto.assignee.toString() !== userId.toString()
+      updateData.assignee &&
+      task.assignee?.toString() !== updateData.assignee.toString() &&
+      updateData.assignee.toString() !== userId.toString()
     ) {
       this.notificationPushService
-        .pushNotificationToUser(updateTaskDto.assignee, {
+        .pushNotificationToUser(updateTaskDto.assignee as ObjectIdLike, {
           title: `Task Assigned: "${task.title}"`,
           message: `You have been assigned to task "${task.title}"`,
           projectId: task.projectId,
@@ -273,12 +394,16 @@ export class TasksService {
         });
     }
 
-    // Notify assignee and reporter about status change
+    /**
+     * Notify Status Change Users
+     */
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
       const usersToNotify = new Set<string>();
+
       if (task.assignee && task.assignee.toString() !== userId.toString()) {
         usersToNotify.add(task.assignee.toString());
       }
+
       if (task.reporter.toString() !== userId.toString()) {
         usersToNotify.add(task.reporter.toString());
       }

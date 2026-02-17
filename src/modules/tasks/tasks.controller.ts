@@ -91,7 +91,11 @@ export class TasksController {
     if (files && files.length) {
       createTaskDto.attachments = files.map((file) => file.filename);
     }
-    const result = await this.tasksService.create(req.user._id, createTaskDto);
+    const result = await this.tasksService.create(
+      req.user._id,
+      req.user.role,
+      createTaskDto,
+    );
     return { success: true, result };
   }
 
@@ -101,14 +105,22 @@ export class TasksController {
     @Req() req: AuthenticatedRequest,
     @Query() query?: TaskFilters,
   ) {
-    const result = await this.tasksService.findAll(req.user._id, query);
+    const result = await this.tasksService.findAll(
+      req.user._id,
+      req.user.role,
+      query,
+    );
     return { success: true, result };
   }
 
   @Get(':id')
   @GetTaskByIdDocs()
   async findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const result = await this.tasksService.findOne(req.user._id, id);
+    const result = await this.tasksService.findOne(
+      req.user._id,
+      req.user.role,
+      id,
+    );
     return { success: true, result };
   }
 
@@ -121,6 +133,7 @@ export class TasksController {
   ) {
     const result = await this.tasksService.update(
       req.user._id,
+      req.user.role,
       id,
       updateTaskDto,
     );
@@ -130,7 +143,11 @@ export class TasksController {
   @Delete(':id')
   @DeleteTaskDocs()
   async remove(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
-    const result = await this.tasksService.delete(req.user._id, id);
+    const result = await this.tasksService.delete(
+      req.user._id,
+      req.user.role,
+      id,
+    );
     return { success: true, result };
   }
 }

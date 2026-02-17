@@ -12,6 +12,7 @@ import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { TaskFilters } from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
+import { Role } from '../auth/types/auth.types';
 
 @Injectable()
 export class TasksService {
@@ -21,14 +22,26 @@ export class TasksService {
     private readonly notificationPushService: NotificationPushService,
   ) {}
 
-  async create(userId: ObjectIdLike, createTaskDto: CreateTaskDto) {
-    const project = await this.projectModel.findOne({
-      _id: createTaskDto.projectId,
-      'members.user': userId,
-    });
+  async create(userId: ObjectIdLike, role: Role, createTaskDto: CreateTaskDto) {
+    let project: Project | null;
 
-    if (!project) {
-      throw new UnauthorizedException('User is not a member of the project');
+    if (role !== Role.SUPERADMIN) {
+      project = await this.projectModel.findOne({
+        _id: createTaskDto.projectId,
+        'members.user': userId,
+      });
+
+      if (!project) {
+        throw new UnauthorizedException('User is not a member of the project');
+      }
+    } else {
+      project = await this.projectModel.findOne({
+        _id: createTaskDto.projectId,
+      });
+
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
     }
 
     const newTask = await this.taskModel.create({
@@ -43,37 +56,67 @@ export class TasksService {
 
     // Send notification to assignee if task is assigned
     if (newTask.assignee && newTask.assignee.toString() !== userId.toString()) {
-      await this.notificationPushService.pushNotificationToUser(
-        newTask.assignee,
-        {
+      this.notificationPushService
+        .pushNotificationToUser(newTask.assignee, {
           title: `New Task Assigned: "${newTask.title}"`,
           message: `You have been assigned to task "${newTask.title}" in project "${project.name}"`,
           projectId: newTask.projectId,
           taskId: newTask._id,
-        },
-      );
+        })
+        .catch((err) => {
+          console.error(
+            'Error sending notification for new task assignment:',
+            err,
+          );
+        });
     }
 
     return newTask;
   }
 
-  async findAll(userId: ObjectIdLike, filter: TaskFilters = {}) {
+  async findAll(userId: ObjectIdLike, role: Role, filter: TaskFilters = {}) {
     const pipeline: PipelineStage[] = [];
 
-    if (filter.projectId) {
-      pipeline.push({
-        $match: {
-          projectId: new mongoose.Types.ObjectId(filter.projectId),
-        },
-      });
+    if (role === Role.SUPERADMIN) {
+      if (filter.projectId) {
+        pipeline.push({
+          $match: {
+            projectId: new mongoose.Types.ObjectId(filter.projectId),
+          },
+        });
+      } else {
+        const projectIds = await this.projectModel.find({}, { _id: 1 });
+        pipeline.push({
+          $match: { projectId: { $in: projectIds.map((p) => p._id) } },
+        });
+      }
     } else {
-      const projectIds = await this.projectModel.find(
-        { 'members.user': userId },
-        { _id: 1 },
-      );
-      pipeline.push({
-        $match: { projectId: { $in: projectIds.map((p) => p._id) } },
-      });
+      if (filter.projectId) {
+        const project = await this.projectModel.findOne({
+          _id: filter.projectId,
+          'members.user': userId,
+        });
+
+        if (!project) {
+          throw new UnauthorizedException(
+            'User is not a member of the specified project',
+          );
+        }
+
+        pipeline.push({
+          $match: {
+            projectId: new mongoose.Types.ObjectId(filter.projectId),
+          },
+        });
+      } else {
+        const projectIds = await this.projectModel.find(
+          { 'members.user': userId },
+          { _id: 1 },
+        );
+        pipeline.push({
+          $match: { projectId: { $in: projectIds.map((p) => p._id) } },
+        });
+      }
     }
 
     if (filter.searchQuery) {
@@ -179,24 +222,18 @@ export class TasksService {
     return result;
   }
 
-  async findAllAssignedTasks(userId: ObjectIdLike) {
-    const result = await this.taskModel
-      .find({ assignee: userId })
-      .populate('projectId', 'name')
-      .populate('assignee', 'name email')
-      .populate('reporter', 'name email');
-
-    return result;
-  }
-
-  async findOne(userId: ObjectIdLike, id: string) {
+  async findOne(userId: ObjectIdLike, role: Role, id: string) {
     const task = await this.taskModel
       .findById(id)
       .populate('assignee', 'name email')
       .populate('reporter', 'name email');
 
     if (!task) {
-      throw new Error('Task not found');
+      throw new NotFoundException('Task not found');
+    }
+
+    if (role === Role.SUPERADMIN) {
+      return task;
     }
 
     const project = await this.projectModel.findOne({
@@ -205,7 +242,7 @@ export class TasksService {
     });
 
     if (!project) {
-      throw new Error('Unauthorized');
+      throw new UnauthorizedException('User is not a member of this project');
     }
 
     return task;
@@ -213,6 +250,7 @@ export class TasksService {
 
   async update(
     userId: ObjectIdLike,
+    role: Role,
     id: ObjectIdLike,
     updateTaskDto: UpdateTaskDto,
   ) {
@@ -222,7 +260,7 @@ export class TasksService {
       throw new NotFoundException('Task not found');
     }
 
-    await this.checkMembership(userId, task.projectId);
+    await this.checkMembership(userId, role, task.projectId);
 
     const updatedTask = await this.taskModel
       .findByIdAndUpdate(id, updateTaskDto, {
@@ -237,15 +275,16 @@ export class TasksService {
       task.assignee?.toString() !== updateTaskDto.assignee.toString() &&
       updateTaskDto.assignee.toString() !== userId.toString()
     ) {
-      await this.notificationPushService.pushNotificationToUser(
-        updateTaskDto.assignee,
-        {
+      this.notificationPushService
+        .pushNotificationToUser(updateTaskDto.assignee, {
           title: `Task Assigned: "${task.title}"`,
           message: `You have been assigned to task "${task.title}"`,
           projectId: task.projectId,
           taskId: task._id,
-        },
-      );
+        })
+        .catch((err) => {
+          console.error('Error sending notification for task assignment:', err);
+        });
     }
 
     // Notify assignee and reporter about status change
@@ -258,7 +297,7 @@ export class TasksService {
         usersToNotify.add(task.reporter.toString());
       }
 
-      await Promise.all(
+      Promise.all(
         Array.from(usersToNotify).map((notifyUserId) =>
           this.notificationPushService.pushNotificationToUser(notifyUserId, {
             title: `Task Status Updated: "${task.title}"`,
@@ -267,20 +306,25 @@ export class TasksService {
             taskId: task._id,
           }),
         ),
-      );
+      ).catch((err) => {
+        console.error(
+          'Error sending notifications for task status update:',
+          err,
+        );
+      });
     }
 
     return updatedTask;
   }
 
-  async delete(userId: ObjectIdLike, id: string) {
+  async delete(userId: ObjectIdLike, role: Role, id: string) {
     const task = await this.taskModel.findById(id);
 
     if (!task) {
       throw new NotFoundException('Task not found');
     }
 
-    await this.checkMembership(userId, task.projectId);
+    await this.checkMembership(userId, role, task.projectId);
 
     // Notify assignee and reporter about task deletion
     const usersToNotify = new Set<string>();
@@ -291,7 +335,7 @@ export class TasksService {
       usersToNotify.add(task.reporter.toString());
     }
 
-    await Promise.all(
+    Promise.all(
       Array.from(usersToNotify).map((notifyUserId) =>
         this.notificationPushService.pushNotificationToUser(notifyUserId, {
           title: `Task Deleted: "${task.title}"`,
@@ -299,7 +343,9 @@ export class TasksService {
           projectId: task.projectId,
         }),
       ),
-    );
+    ).catch((err) => {
+      console.error('Error sending notifications for task deletion:', err);
+    });
 
     const deletedTask = await this.taskModel
       .findByIdAndDelete(id)
@@ -310,9 +356,14 @@ export class TasksService {
   }
 
   async checkMembership(
-    userId: string | mongoose.Types.ObjectId,
-    projectId: string | mongoose.Types.ObjectId,
+    userId: ObjectIdLike,
+    role: Role,
+    projectId: ObjectIdLike,
   ) {
+    if (role === Role.SUPERADMIN) {
+      return;
+    }
+
     const project = await this.projectModel.findOne({
       _id: projectId,
       'members.user': userId,

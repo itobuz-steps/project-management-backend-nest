@@ -39,12 +39,7 @@ export class TasksService {
 
     // Prepare task data and filter out invalid assignee values
     const taskData = { ...createTaskDto };
-    if (
-      !taskData.assignee ||
-      taskData.assignee === '' ||
-      taskData.assignee === 'undefined' ||
-      taskData.assignee === 'null'
-    ) {
+    if (!taskData.assignee || taskData.assignee === '') {
       delete taskData.assignee;
     }
 

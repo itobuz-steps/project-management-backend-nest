@@ -17,6 +17,7 @@ import {
   SprintIdParams,
   SprintAccessParams,
 } from './type/sprint.types';
+import { ProjectType } from '../project/type/project.types';
 
 @Injectable()
 export class SprintService {
@@ -85,6 +86,10 @@ export class SprintService {
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
+    }
+
+    if (project.projectType === ProjectType.KANBAN) {
+      throw new ForbiddenException('Cannot create sprint in a kanban project');
     }
 
     const sprint = new this.sprintModel({

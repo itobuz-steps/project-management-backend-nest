@@ -126,23 +126,24 @@ export class TasksController {
 
   @Patch(':id')
   @UpdateTaskDocs()
+  @UseInterceptors(
+    FilesInterceptor('attachments', 10, multerOptionsForMultipleFiles),
+  )
+  @ApiConsumes('multipart/form-data')
   async update(
     @Param('id') id: string,
     @Body() updateTaskDto: UpdateTaskDto,
     @Req() req: AuthenticatedRequest,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    console.log(
-      'CONTROLLER - Raw body received:',
-      JSON.stringify(updateTaskDto, null, 2),
-    );
-    console.log('CONTROLLER - Has assignee?', 'assignee' in updateTaskDto);
-    console.log('CONTROLLER - assignee value:', updateTaskDto.assignee);
+    const newFileNames = files?.map((file) => file.filename) ?? [];
 
     const result = await this.tasksService.update(
       req.user._id,
       req.user.role,
       id,
       updateTaskDto,
+      newFileNames,
     );
     return { success: true, result };
   }

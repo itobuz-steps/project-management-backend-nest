@@ -267,6 +267,7 @@ export class TasksService {
     role: Role,
     id: ObjectIdLike,
     updateTaskDto: UpdateTaskDto,
+    newFileNames: string[] = [],
   ) {
     const task = await this.taskModel.findById(id);
 
@@ -289,6 +290,25 @@ export class TasksService {
         ? new Types.ObjectId(updateTaskDto.assignee)
         : null,
     };
+
+    delete updateData['existingAttachments'];
+
+    if (updateTaskDto.existingAttachments || newFileNames.length) {
+      const currentAttachments = task.attachments ?? [];
+
+      // Determine which existing attachments to keep
+      let keptAttachments: string[];
+      if (updateTaskDto.existingAttachments) {
+        keptAttachments = updateTaskDto.existingAttachments.filter(
+          (f: string) => currentAttachments.includes(f),
+        );
+      } else {
+        keptAttachments = [...currentAttachments];
+      }
+
+      // Merge with newly uploaded files
+      updateData.attachments = [...keptAttachments, ...newFileNames];
+    }
 
     /**
      * Remove undefined fields
@@ -366,7 +386,7 @@ export class TasksService {
       }
     }
 
-    if (changes) {
+    if (changes.length) {
       await this.activityService.logTaskUpdated({
         taskId: task._id.toString(),
         byUserId: userId.toString(),

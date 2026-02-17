@@ -23,26 +23,11 @@ export class TasksService {
   ) {}
 
   async create(userId: ObjectIdLike, role: Role, createTaskDto: CreateTaskDto) {
-    let project: Project | null;
-
-    if (role !== Role.SUPERADMIN) {
-      project = await this.projectModel.findOne({
-        _id: createTaskDto.projectId,
-        'members.user': userId,
-      });
-
-      if (!project) {
-        throw new UnauthorizedException('User is not a member of the project');
-      }
-    } else {
-      project = await this.projectModel.findOne({
-        _id: createTaskDto.projectId,
-      });
-
-      if (!project) {
-        throw new NotFoundException('Project not found');
-      }
-    }
+    const project = await this.checkMembership(
+      userId,
+      role,
+      createTaskDto.projectId,
+    );
 
     const newTask = await this.taskModel.create({
       ...createTaskDto,
@@ -86,6 +71,7 @@ export class TasksService {
         });
       } else {
         const projectIds = await this.projectModel.find({}, { _id: 1 });
+
         pipeline.push({
           $match: { projectId: { $in: projectIds.map((p) => p._id) } },
         });
@@ -361,7 +347,15 @@ export class TasksService {
     projectId: ObjectIdLike,
   ) {
     if (role === Role.SUPERADMIN) {
-      return;
+      const project = await this.projectModel.findOne({
+        _id: projectId,
+      });
+
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
+
+      return project;
     }
 
     const project = await this.projectModel.findOne({
@@ -372,5 +366,7 @@ export class TasksService {
     if (!project) {
       throw new UnauthorizedException('User is not a member of this project');
     }
+
+    return project;
   }
 }

@@ -19,13 +19,13 @@ import { ProjectRole } from '../type/project.types';
 
 type AuthenticatedRequest = Request & { user?: UserDocument };
 
-@Controller('project/:projectId/invites')
+@Controller('project/')
+@UseGuards(IsAuthenticated)
 @ApiBearerAuth()
 export class InviteUserController {
   constructor(private readonly inviteUserService: InviteUserService) {}
 
-  @Post('send')
-  @UseGuards(IsAuthenticated)
+  @Post('/:projectId/invites/send')
   @Roles(ProjectRole.ADMIN)
   inviteUsers(
     @Param('projectId') projectId: string,
@@ -34,7 +34,7 @@ export class InviteUserController {
     return this.inviteUserService.inviteUsers(projectId, dto);
   }
 
-  @Get('accept')
+  @Get('invites/accept')
   @UseGuards(IsAuthenticated)
   acceptUsersInvite(
     @Req() req: AuthenticatedRequest,

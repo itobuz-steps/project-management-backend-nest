@@ -24,7 +24,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
     }),
     ServeStaticModule.forRootAsync({
       useFactory: () => {
-        const uploadsPath = join(__dirname, '..', 'uploads');
+        const uploadsPath = join(__dirname, '..', '..', 'uploads');
         console.log(`Serving static files from: ${uploadsPath}`);
         return [
           {

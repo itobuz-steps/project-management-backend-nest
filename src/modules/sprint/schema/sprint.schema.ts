@@ -27,6 +27,12 @@ export class Sprint extends Document {
     required: true,
   })
   projectId: Types.ObjectId;
+
+  @Prop({
+    type: Date,
+    default: null,
+  })
+  endDate?: Date;
 }
 
 export const SprintSchema = SchemaFactory.createForClass(Sprint);

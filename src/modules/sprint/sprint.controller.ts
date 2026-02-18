@@ -157,4 +157,11 @@ export class SprintController {
       message: 'Sprint tasks updated successfully',
     };
   }
+
+  @Get(':sprintId/completed-tasks')
+  async getCompletedTasks(@Param('sprintId') sprintId: string) {
+    const { completed } =
+      await this.sprintService.getSprintCompletionSummary(sprintId);
+    return completed;
+  }
 }

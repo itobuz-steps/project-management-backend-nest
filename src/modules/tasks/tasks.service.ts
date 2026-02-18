@@ -366,7 +366,7 @@ export class TasksService {
       }
     }
 
-    if (changes) {
+    if (changes.length) {
       await this.activityService.logTaskUpdated({
         taskId: task._id.toString(),
         byUserId: userId.toString(),

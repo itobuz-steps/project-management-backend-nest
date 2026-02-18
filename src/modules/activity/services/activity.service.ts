@@ -9,6 +9,7 @@ import {
   LogStatusChangeParams,
   LogCommentAddedParams,
   LogAssigneeChangeParams,
+  LogRemovedFromSprintParams,
 } from '../type/activity-params.types';
 
 @Injectable()
@@ -157,5 +158,21 @@ export class ActivityService {
     ]);
 
     return { activities, total };
+  }
+
+  async logRemovedFromSprint(
+    params: LogRemovedFromSprintParams,
+  ): Promise<Activity> {
+    const { taskId, byUserId, sprintId } = params;
+    const updatedFields: Record<string, { from: string; to: string }> = {};
+
+    updatedFields.sprint = { from: sprintId?.toString() ?? '', to: '' };
+
+    return this.activityModel.create({
+      task: new Types.ObjectId(taskId),
+      action: ActivityAction.REMOVED_FROM_SPRINT,
+      byUser: new Types.ObjectId(byUserId),
+      updatedFields,
+    });
   }
 }

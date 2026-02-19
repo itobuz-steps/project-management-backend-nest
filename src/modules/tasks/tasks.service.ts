@@ -283,12 +283,15 @@ export class TasksService {
       assignee?: Types.ObjectId | null;
     };
 
+    const { assignee, ...rest } = updateTaskDto;
+
     const updateData: UpdateDataType = {
-      ...updateTaskDto,
-      assignee: updateTaskDto.assignee
-        ? new Types.ObjectId(updateTaskDto.assignee)
-        : null,
+      ...rest,
     };
+
+    if (assignee !== undefined) {
+      updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
+    }
 
     /**
      * Remove undefined fields

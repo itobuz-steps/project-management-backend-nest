@@ -10,11 +10,14 @@ import {
   LogCommentAddedParams,
   LogAssigneeChangeParams,
 } from '../type/activity-params.types';
+import { User, UserDocument } from 'src/modules/auth/schemas/user.schema';
 
 @Injectable()
 export class ActivityService {
   constructor(
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
   ) {}
 
   async logTaskCreated(params: LogTaskCreatedParams): Promise<Activity> {
@@ -79,7 +82,10 @@ export class ActivityService {
         byUser: new Types.ObjectId(byUserId),
         targetUser: new Types.ObjectId(newAssigneeId),
         updatedFields: {
-          assignee: { to: newAssigneeId },
+          assignee: {
+            to: (await this.userModel.findById(newAssigneeId).select('name'))!
+              .name,
+          },
         },
       });
     } else {

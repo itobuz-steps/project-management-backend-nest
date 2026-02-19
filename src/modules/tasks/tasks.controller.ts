@@ -99,6 +99,16 @@ export class TasksController {
     return { success: true, result };
   }
 
+  @Get('stats')
+  async getStats(@Req() req: AuthenticatedRequest) {
+    const result = await this.tasksService.getStats(req.user._id);
+
+    return {
+      success: true,
+      result,
+    };
+  }
+
   @Get()
   @GetAllTasksDocs()
   async findAll(

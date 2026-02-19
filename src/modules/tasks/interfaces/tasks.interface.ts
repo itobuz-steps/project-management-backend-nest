@@ -22,3 +22,11 @@ export const TRACKABLE_TASK_FIELDS = [
   'dueDate',
   'storyPoint',
 ] as const;
+
+export interface TaskStats {
+  totalAssignedTasks: number;
+  tasksCompletedThisWeek: number;
+  storyPointsCompletedThisWeek: number;
+  allTasksGroupedByProject: Record<string, Task[]>;
+  completedTasksGroupedByProject: Record<string, Task[]>;
+}

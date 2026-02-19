@@ -10,9 +10,10 @@ import mongoose, { HydratedDocument, Model, PipelineStage } from 'mongoose';
 import { Task } from './entities/task.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { Project } from '../project/schema/project.schema';
-import { ObjectIdLike } from 'src/type/common.type';
+import type { ObjectIdLike } from 'src/type/common.type';
 import {
   TaskFilters,
+  TaskStats,
   TRACKABLE_TASK_FIELDS,
 } from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
@@ -369,7 +370,7 @@ export class TasksService {
       }
     }
 
-    if (changes) {
+    if (changes.length) {
       await this.activityService.logTaskUpdated({
         taskId: task._id.toString(),
         byUserId: userId.toString(),
@@ -496,5 +497,230 @@ export class TasksService {
     }
 
     return project;
+  }
+
+  async getStats(userId: ObjectIdLike) {
+    console.log('Getting task stats for user:', userId);
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const pipeline: PipelineStage[] = [];
+
+    // Stage 1: Find tasks assigned to the user
+    pipeline.push({
+      $match: {
+        assignee: new mongoose.Types.ObjectId(userId.toString()),
+      },
+    });
+
+    // Stage 2: Populate project details
+    pipeline.push({
+      $lookup: {
+        from: 'projects',
+        localField: 'projectId',
+        foreignField: '_id',
+        as: 'project',
+      },
+    });
+
+    pipeline.push({
+      $unwind: {
+        path: '$project',
+        preserveNullAndEmptyArrays: false,
+      },
+    });
+
+    // Stage 3: Get the last column (done status) from project.columns
+    pipeline.push({
+      $addFields: {
+        doneStatus: { $arrayElemAt: ['$project.columns', -1] },
+      },
+    });
+
+    // Stage 4: Lookup activity logs for each task (STATUS_CHANGED only, within last week)
+    pipeline.push({
+      $lookup: {
+        from: 'activities',
+        let: { taskId: '$_id', doneStatus: '$doneStatus' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$task', '$$taskId'] },
+                  { $eq: ['$action', 'STATUS_CHANGED'] },
+                  { $gte: ['$createdAt', oneWeekAgo] },
+                  { $eq: ['$updatedFields.status.to', '$$doneStatus'] },
+                ],
+              },
+            },
+          },
+          // Sort descending to get the latest status change first
+          { $sort: { createdAt: -1 } },
+          // Take only the last (most recent) transition to done
+          { $limit: 1 },
+        ],
+        as: 'doneActivities',
+      },
+    });
+
+    // Stage 5: Keep only tasks that have at least one "moved to done" activity this week
+    pipeline.push({
+      $addFields: {
+        lastDoneActivity: { $arrayElemAt: ['$doneActivities', 0] },
+      },
+    });
+
+    // Stage 6: Group to get the count of tasks completed this week
+    pipeline.push({
+      $facet: {
+        // All tasks assigned to user (with project populated)
+        allTasks: [
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              key: 1,
+              status: 1,
+              priority: 1,
+              project: {
+                _id: '$project._id',
+                name: '$project.name',
+                prefix: '$project.prefix',
+                columns: '$project.columns',
+              },
+              doneStatus: 1,
+              lastDoneActivity: 1,
+            },
+          },
+        ],
+        allTasksGroupedByProject: [
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              key: 1,
+              status: 1,
+              priority: 1,
+              project: {
+                _id: '$project._id',
+                name: '$project.name',
+                prefix: '$project.prefix',
+                columns: '$project.columns',
+              },
+              doneStatus: 1,
+              lastDoneActivity: 1,
+            },
+          },
+          {
+            $group: {
+              _id: '$project.name',
+              tasks: {
+                $push: {
+                  _id: '$_id',
+                  title: '$title',
+                  key: '$key',
+                  status: '$status',
+                  completedAt: '$completedAt',
+                },
+              },
+            },
+          },
+        ],
+        // Count of tasks that moved to done status in the last week
+        completedThisWeek: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $count: 'count',
+          },
+        ],
+        // Total story points of tasks completed this week
+        storyPointsCompletedThisWeek: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: { $ifNull: ['$storyPoint', 0] } },
+            },
+          },
+        ],
+        // Detailed list of tasks completed this week
+        completedTasksGroupedByProject: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              key: 1,
+              status: 1,
+              projectName: '$project.name',
+              completedAt: '$lastDoneActivity.createdAt',
+            },
+          },
+          {
+            $group: {
+              _id: '$projectName',
+              tasks: {
+                $push: {
+                  _id: '$_id',
+                  title: '$title',
+                  key: '$key',
+                  status: '$status',
+                  completedAt: '$completedAt',
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    // Stage 7: Reshape the output
+    pipeline.push({
+      $project: {
+        totalAssignedTasks: { $size: '$allTasks' },
+        tasksCompletedThisWeek: {
+          $ifNull: [{ $arrayElemAt: ['$completedThisWeek.count', 0] }, 0],
+        },
+        storyPointsCompletedThisWeek: {
+          $ifNull: [
+            { $arrayElemAt: ['$storyPointsCompletedThisWeek.total', 0] },
+            0,
+          ],
+        },
+        allTasksGroupedByProject: 1,
+        completedTasksGroupedByProject: 1,
+      },
+    });
+
+    const result = await this.taskModel.aggregate<TaskStats>(pipeline).exec();
+
+    console.log(
+      'Task stats aggregation result:',
+      JSON.stringify(result, null, 2),
+    );
+
+    return (
+      result[0] ?? {
+        totalAssignedTasks: 0,
+        tasksCompletedThisWeek: 0,
+        storyPointsCompletedThisWeek: 0,
+        allTasksGroupedByProject: [],
+        completedTasksGroupedByProject: [],
+      }
+    );
   }
 }

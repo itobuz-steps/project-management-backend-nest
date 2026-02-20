@@ -29,6 +29,9 @@ export class Comment extends Document {
     default: null,
   })
   attachment: string | null;
+
+  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'User' }] })
+  mentions: Types.ObjectId[];
 }
 
 export const CommentSchema = SchemaFactory.createForClass(Comment);

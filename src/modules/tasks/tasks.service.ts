@@ -653,6 +653,40 @@ export class TasksService {
             },
           },
         ],
+        // Daily count of tasks completed in the last week
+        tasksCompletedEachDay: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $project: {
+              date: {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$lastDoneActivity.createdAt',
+                },
+              },
+            },
+          },
+          {
+            $group: {
+              _id: '$date',
+              count: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              date: '$_id',
+              count: 1,
+            },
+          },
+          {
+            $sort: { date: 1 },
+          },
+        ],
         // Detailed list of tasks completed this week
         completedTasksGroupedByProject: [
           {
@@ -701,6 +735,9 @@ export class TasksService {
             0,
           ],
         },
+        tasksCompletedEachDay: {
+          $ifNull: ['$tasksCompletedEachDay', []],
+        },
         allTasksGroupedByProject: 1,
         completedTasksGroupedByProject: 1,
       },
@@ -718,6 +755,7 @@ export class TasksService {
         totalAssignedTasks: 0,
         tasksCompletedThisWeek: 0,
         storyPointsCompletedThisWeek: 0,
+        tasksCompletedEachDay: [],
         allTasksGroupedByProject: [],
         completedTasksGroupedByProject: [],
       }

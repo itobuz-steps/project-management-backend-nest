@@ -170,6 +170,57 @@ export function GetAllTasksDocs() {
   );
 }
 
+export function GetTaskStatsDocs(): MethodDecorator {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Get task stats',
+      description:
+        'Retrieve task statistics for the authenticated user, including total assigned tasks, weekly completed tasks, story points completed, and daily completion counts.',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Task stats retrieved successfully',
+      schema: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          result: {
+            type: 'object',
+            properties: {
+              totalAssignedTasks: { type: 'number', example: 12 },
+              tasksCompletedThisWeek: { type: 'number', example: 4 },
+              storyPointsCompletedThisWeek: { type: 'number', example: 18 },
+              tasksCompletedEachDay: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    date: { type: 'string', example: '2026-02-18' },
+                    count: { type: 'number', example: 2 },
+                  },
+                },
+              },
+              allTasksGroupedByProject: {
+                type: 'array',
+                items: { type: 'object' },
+              },
+              completedTasksGroupedByProject: {
+                type: 'array',
+                items: { type: 'object' },
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
+      schema: ErrorResponse,
+    }),
+  );
+}
+
 export function GetTaskByIdDocs() {
   return applyDecorators(
     ApiOperation({

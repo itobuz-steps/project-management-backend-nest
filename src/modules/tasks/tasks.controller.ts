@@ -26,6 +26,7 @@ import {
   GetTaskByIdDocs,
   UpdateTaskDocs,
   DeleteTaskDocs,
+  GetTaskStatsDocs,
 } from './tasks.swagger';
 import { multerOptionsForMultipleFiles } from 'src/config/multer.config';
 
@@ -100,6 +101,7 @@ export class TasksController {
   }
 
   @Get('stats')
+  @GetTaskStatsDocs()
   async getStats(@Req() req: AuthenticatedRequest) {
     const result = await this.tasksService.getStats(req.user._id);
 

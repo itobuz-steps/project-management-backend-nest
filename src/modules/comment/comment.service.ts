@@ -142,7 +142,7 @@ export class CommentService {
     );
 
     if (addedMentions.length) {
-      await Promise.all(
+      Promise.all(
         addedMentions.map((mentionedUserId) =>
           this.notificationPushService.pushNotificationToUser(mentionedUserId, {
             title: `You were mentioned in a comment "${task.title}"'`,
@@ -151,7 +151,7 @@ export class CommentService {
             projectId: task.projectId,
           }),
         ),
-      );
+      ).catch((err) => console.error('Error sending notifications:', err));
     }
 
     return updatedComment!;

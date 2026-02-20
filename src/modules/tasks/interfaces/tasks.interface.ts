@@ -27,6 +27,10 @@ export interface TaskStats {
   totalAssignedTasks: number;
   tasksCompletedThisWeek: number;
   storyPointsCompletedThisWeek: number;
+  tasksCompletedEachDay: {
+    date: string;
+    count: number;
+  }[];
   allTasksGroupedByProject: Record<string, Task[]>;
   completedTasksGroupedByProject: Record<string, Task[]>;
 }

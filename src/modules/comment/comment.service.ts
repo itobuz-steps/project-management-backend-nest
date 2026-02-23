@@ -14,6 +14,7 @@ import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class CommentService {
@@ -23,6 +24,7 @@ export class CommentService {
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
     private readonly notificationPushService: NotificationPushService,
     private readonly activityService: ActivityService,
+    private readonly storageService: StorageService,
   ) {}
 
   async getCommentsByTaskId(
@@ -42,11 +44,20 @@ export class CommentService {
     role: Role,
     taskId: ObjectIdLike,
     createCommentDto: CreateCommentDto,
+    file?: Express.Multer.File,
   ): Promise<Comment> {
     const task = await this.checkMembership(userId, role, taskId);
 
+    let attachment: string | null = null;
+
+    if (file) {
+      const uploadResult = await this.storageService.uploadSingleFile(file);
+      attachment = uploadResult.url;
+    }
+
     const newComment = await this.commentModel.create({
       ...createCommentDto,
+      attachment,
       taskId,
       author: userId,
     });
@@ -71,18 +82,27 @@ export class CommentService {
       usersToNotify.add(task.reporter.toString());
     }
 
+    // Add mentions to notification
+    if (createCommentDto.mentions && createCommentDto.mentions.length) {
+      createCommentDto.mentions.forEach((mentionedUserId) => {
+        if (mentionedUserId !== userId.toString()) {
+          console.log(mentionedUserId);
+          usersToNotify.add(mentionedUserId);
+        }
+      });
+    }
+
+    // Send notifications
     Promise.all(
       Array.from(usersToNotify).map((notifyUserId) =>
         this.notificationPushService.pushNotificationToUser(notifyUserId, {
           title: `New Comment on "${task.title}"`,
-          message: `A new comment was added to task "${task.title}"`,
+          message: `${userId.toString() === notifyUserId ? 'You were mentioned in a comment' : 'A new comment was added'}`,
           projectId: task.projectId,
           taskId: task._id,
         }),
       ),
-    ).catch((err) => {
-      console.error('Error sending notifications for new comment:', err);
-    });
+    ).catch((err) => console.error('Error sending notifications:', err));
 
     return newComment;
   }
@@ -92,10 +112,17 @@ export class CommentService {
     role: Role,
     commentId: ObjectIdLike,
     updateCommentDto: UpdateCommentDto,
-  ): Promise<Comment | null> {
+  ): Promise<Comment> {
     const comment = await this.commentModel.findById(commentId);
+
     if (!comment) {
       throw new NotFoundException('Comment not found');
+    }
+
+    const task = await this.taskModel.findById(comment.taskId);
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
     }
 
     if (
@@ -107,9 +134,38 @@ export class CommentService {
       );
     }
 
-    return this.commentModel.findByIdAndUpdate(commentId, updateCommentDto, {
-      new: true,
-    });
+    const oldMentions = new Set(
+      (comment.mentions || []).map((id) => id.toString()),
+    );
+
+    const newMentions = new Set(
+      (updateCommentDto.mentions || []).map((id) => id.toString()),
+    );
+
+    const addedMentions = [...newMentions].filter(
+      (id) => !oldMentions.has(id) && id !== userId.toString(),
+    );
+
+    const updatedComment = await this.commentModel.findByIdAndUpdate(
+      commentId,
+      updateCommentDto,
+      { new: true },
+    );
+
+    if (addedMentions.length) {
+      Promise.all(
+        addedMentions.map((mentionedUserId) =>
+          this.notificationPushService.pushNotificationToUser(mentionedUserId, {
+            title: `You were mentioned in a comment "${task.title}"'`,
+            message: 'You were mentioned in an edited comment',
+            taskId: comment.taskId,
+            projectId: task.projectId,
+          }),
+        ),
+      ).catch((err) => console.error('Error sending notifications:', err));
+    }
+
+    return updatedComment!;
   }
 
   async remove(

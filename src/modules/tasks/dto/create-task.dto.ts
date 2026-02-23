@@ -5,8 +5,8 @@ import {
   IsEnum,
   IsArray,
   IsDateString,
-  IsNumber,
   IsMongoId,
+  IsNumberString,
 } from 'class-validator';
 import { TASK_PRIORITIES, TASK_TYPES } from '../../../constants/task.constants';
 import type { TaskPriority, TaskType } from '../../../constants/task.constants';
@@ -94,7 +94,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
-  @IsNumber()
+  @IsNumberString()
   storyPoint?: number;
 
   @ApiProperty({
@@ -114,11 +114,6 @@ export class CreateTaskDto {
     example: ['https://example.com/file.pdf'],
     required: false,
   })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  attachments?: string[];
-
   @ApiProperty({
     description: 'Parent task ID',
     example: '507f1f77bcf86cd799439016',

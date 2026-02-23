@@ -10,14 +10,17 @@ import mongoose, { HydratedDocument, Model, PipelineStage } from 'mongoose';
 import { Task } from './entities/task.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { Project } from '../project/schema/project.schema';
-import { ObjectIdLike } from 'src/type/common.type';
+import type { ObjectIdLike } from 'src/type/common.type';
 import {
   TaskFilters,
+  TaskStats,
   TRACKABLE_TASK_FIELDS,
 } from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
+import { StorageService } from 'src/storage/storage.service';
+import { Length } from 'class-validator';
 
 @Injectable()
 export class TasksService {
@@ -26,9 +29,15 @@ export class TasksService {
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
     private readonly activityService: ActivityService,
     private readonly notificationPushService: NotificationPushService,
+    private readonly storageService: StorageService,
   ) {}
 
-  async create(userId: ObjectIdLike, role: Role, createTaskDto: CreateTaskDto) {
+  async create(
+    userId: ObjectIdLike,
+    role: Role,
+    createTaskDto: CreateTaskDto,
+    files: Express.Multer.File[] = [],
+  ) {
     const project = await this.checkMembership(
       userId,
       role,
@@ -41,10 +50,23 @@ export class TasksService {
       delete taskData.assignee;
     }
 
+    let uploadRes: Awaited<
+      ReturnType<typeof this.storageService.uploadMultipleFiles>
+    > | null = null;
+
+    if (files && files.length) {
+      const uploadResults =
+        await this.storageService.uploadMultipleFiles(files);
+      uploadRes = uploadResults;
+    }
+
+    console.log(uploadRes);
+
     const newTask = await this.taskModel.create({
       ...taskData,
       reporter: userId,
       key: `${project.prefix}-${project.lastKey + 1}`,
+      attachments: uploadRes ? uploadRes.map((res) => res.url) : [],
     });
 
     project.lastKey += 1;
@@ -267,7 +289,7 @@ export class TasksService {
     role: Role,
     id: ObjectIdLike,
     updateTaskDto: UpdateTaskDto,
-    newFileNames: string[] = [],
+    newFiles: Express.Multer.File[] = [],
   ) {
     const task = await this.taskModel.findById(id);
 
@@ -284,18 +306,28 @@ export class TasksService {
       assignee?: Types.ObjectId | null;
     };
 
+    const { assignee, ...rest } = updateTaskDto;
+
     const updateData: UpdateDataType = {
-      ...updateTaskDto,
-      assignee: updateTaskDto.assignee
-        ? new Types.ObjectId(updateTaskDto.assignee)
-        : null,
+      ...rest,
     };
 
     delete updateData['existingAttachments'];
 
-    if (updateTaskDto.existingAttachments || newFileNames.length) {
-      const currentAttachments = task.attachments ?? [];
+    let uploadRes: Awaited<
+      ReturnType<typeof this.storageService.uploadMultipleFiles>
+    > | null = null;
 
+    if (newFiles.length) {
+      const uploadResults =
+        await this.storageService.uploadMultipleFiles(newFiles);
+      uploadRes = uploadResults;
+    }
+
+    const urls = uploadRes ? uploadRes.map((res) => res.url) : [];
+
+    if (updateTaskDto.existingAttachments || urls.length) {
+      const currentAttachments = task.attachments ?? [];
       // Determine which existing attachments to keep
       let keptAttachments: string[];
       if (updateTaskDto.existingAttachments) {
@@ -307,145 +339,157 @@ export class TasksService {
       }
 
       // Merge with newly uploaded files
-      updateData.attachments = [...keptAttachments, ...newFileNames];
-    }
+      const attachments = [...keptAttachments, ...urls];
 
-    /**
-     * Remove undefined fields
-     */
-    Object.keys(updateData).forEach((key) => {
-      if (updateData[key as keyof UpdateDataType] === undefined) {
-        delete updateData[key as keyof UpdateDataType];
+      if (assignee !== undefined) {
+        updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
       }
-    });
 
-    /**
-     * Perform Update
-     */
-    const updatedTask = await this.taskModel
-      .findByIdAndUpdate(id, updateData, {
-        new: true,
-        runValidators: true,
-      })
-      .populate('assignee', 'name email')
-      .populate('reporter', 'name email');
-
-    /**
-     * Status Change Activity
-     */
-    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
-      await this.activityService.logStatusChange({
-        taskId: task._id.toString(),
-        byUserId: userId.toString(),
-        oldStatus: task.status,
-        newStatus: updateTaskDto.status,
+      /**
+       * Remove undefined fields
+       */
+      Object.keys(updateData).forEach((key) => {
+        if (updateData[key as keyof UpdateDataType] === undefined) {
+          delete updateData[key as keyof UpdateDataType];
+        }
       });
-    }
-    if (updateTaskDto.assignee) {
-      const oldAssigneeId = task.assignee?.toString() || null;
-      const newAssigneeId = updateData.assignee?.toString() || null;
 
-      if (oldAssigneeId !== newAssigneeId) {
-        const newAssignee = updateData.assignee
-          ? await this.projectModel.db.collection('users').findOne(
-              { _id: updateData.assignee },
+      /**
+       * Perform Update
+       */
+      const updatedTask = await this.taskModel
+        .findByIdAndUpdate(
+          id,
+          { ...updateData, attachments },
+          {
+            new: true,
+            runValidators: true,
+          },
+        )
+        .populate('assignee', 'name email')
+        .populate('reporter', 'name email');
 
-              { projection: { name: 1 } },
-            )
-          : null;
-        console.log('New Assignee Details:', newAssignee);
-
-        await this.activityService.logAssigneeChange({
+      /**
+       * Status Change Activity
+       */
+      if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+        await this.activityService.logStatusChange({
           taskId: task._id.toString(),
           byUserId: userId.toString(),
-          newAssigneeId: updateData.assignee?.toString() ?? null,
+          oldStatus: task.status,
+          newStatus: updateTaskDto.status,
         });
       }
-    }
+      if (updateTaskDto.assignee) {
+        const oldAssigneeId = task.assignee?.toString() || null;
+        const newAssigneeId = updateData.assignee?.toString() || null;
 
-    // Track Other Field Changes
+        if (oldAssigneeId !== newAssigneeId) {
+          const newAssignee = updateData.assignee
+            ? await this.projectModel.db.collection('users').findOne(
+                { _id: updateData.assignee },
 
-    const trackableFields = [
-      ...TRACKABLE_TASK_FIELDS,
-    ] as (keyof UpdateTaskDto)[];
+                { projection: { name: 1 } },
+              )
+            : null;
+          console.log('New Assignee Details:', newAssignee);
 
-    const changes: { field: string; oldValue: string; newValue: string }[] = [];
-
-    for (const field of trackableFields) {
-      if (updateTaskDto[field]) {
-        const oldVal = String(task[field] ?? '');
-        const newVal = String(updateTaskDto[field] ?? '');
-
-        if (oldVal !== newVal) {
-          changes.push({
-            field,
-            oldValue: oldVal,
-            newValue: newVal,
+          await this.activityService.logAssigneeChange({
+            taskId: task._id.toString(),
+            byUserId: userId.toString(),
+            newAssigneeId: updateData.assignee?.toString() ?? null,
           });
         }
       }
-    }
 
-    if (changes.length) {
-      await this.activityService.logTaskUpdated({
-        taskId: task._id.toString(),
-        byUserId: userId.toString(),
-        changes,
-      });
-    }
+      // Track Other Field Changes
 
-    /**
-     * Notify New Assignee
-     */
-    if (
-      updateData.assignee &&
-      task.assignee?.toString() !== updateData.assignee.toString() &&
-      updateData.assignee.toString() !== userId.toString()
-    ) {
-      this.notificationPushService
-        .pushNotificationToUser(updateTaskDto.assignee as ObjectIdLike, {
-          title: `Task Assigned: "${task.title}"`,
-          message: `You have been assigned to task "${task.title}"`,
-          projectId: task.projectId,
-          taskId: task._id,
-        })
-        .catch((err) => {
-          console.error('Error sending notification for task assignment:', err);
+      const trackableFields = [
+        ...TRACKABLE_TASK_FIELDS,
+      ] as (keyof UpdateTaskDto)[];
+
+      const changes: { field: string; oldValue: string; newValue: string }[] =
+        [];
+
+      for (const field of trackableFields) {
+        if (updateTaskDto[field]) {
+          const oldVal = String(task[field] ?? '');
+          const newVal = String(updateTaskDto[field] ?? '');
+
+          if (oldVal !== newVal) {
+            changes.push({
+              field,
+              oldValue: oldVal,
+              newValue: newVal,
+            });
+          }
+        }
+      }
+
+      if (changes.length) {
+        await this.activityService.logTaskUpdated({
+          taskId: task._id.toString(),
+          byUserId: userId.toString(),
+          changes,
         });
-    }
-
-    /**
-     * Notify Status Change Users
-     */
-    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
-      const usersToNotify = new Set<string>();
-
-      if (task.assignee && task.assignee.toString() !== userId.toString()) {
-        usersToNotify.add(task.assignee.toString());
       }
 
-      if (task.reporter.toString() !== userId.toString()) {
-        usersToNotify.add(task.reporter.toString());
-      }
-
-      Promise.all(
-        Array.from(usersToNotify).map((notifyUserId) =>
-          this.notificationPushService.pushNotificationToUser(notifyUserId, {
-            title: `Task Status Updated: "${task.title}"`,
-            message: `Task "${task.title}" status changed from "${task.status}" to "${updateTaskDto.status}"`,
+      /**
+       * Notify New Assignee
+       */
+      if (
+        updateData.assignee &&
+        task.assignee?.toString() !== updateData.assignee.toString() &&
+        updateData.assignee.toString() !== userId.toString()
+      ) {
+        this.notificationPushService
+          .pushNotificationToUser(updateTaskDto.assignee as ObjectIdLike, {
+            title: `Task Assigned: "${task.title}"`,
+            message: `You have been assigned to task "${task.title}"`,
             projectId: task.projectId,
             taskId: task._id,
-          }),
-        ),
-      ).catch((err) => {
-        console.error(
-          'Error sending notifications for task status update:',
-          err,
-        );
-      });
-    }
+          })
+          .catch((err) => {
+            console.error(
+              'Error sending notification for task assignment:',
+              err,
+            );
+          });
+      }
 
-    return updatedTask;
+      /**
+       * Notify Status Change Users
+       */
+      if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+        const usersToNotify = new Set<string>();
+
+        if (task.assignee && task.assignee.toString() !== userId.toString()) {
+          usersToNotify.add(task.assignee.toString());
+        }
+
+        if (task.reporter.toString() !== userId.toString()) {
+          usersToNotify.add(task.reporter.toString());
+        }
+
+        Promise.all(
+          Array.from(usersToNotify).map((notifyUserId) =>
+            this.notificationPushService.pushNotificationToUser(notifyUserId, {
+              title: `Task Status Updated: "${task.title}"`,
+              message: `Task "${task.title}" status changed from "${task.status}" to "${updateTaskDto.status}"`,
+              projectId: task.projectId,
+              taskId: task._id,
+            }),
+          ),
+        ).catch((err) => {
+          console.error(
+            'Error sending notifications for task status update:',
+            err,
+          );
+        });
+      }
+
+      return updatedTask;
+    }
   }
 
   async delete(userId: ObjectIdLike, role: Role, id: string) {
@@ -513,5 +557,268 @@ export class TasksService {
     }
 
     return project;
+  }
+
+  async getStats(userId: ObjectIdLike) {
+    console.log('Getting task stats for user:', userId);
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const pipeline: PipelineStage[] = [];
+
+    // Stage 1: Find tasks assigned to the user
+    pipeline.push({
+      $match: {
+        assignee: new mongoose.Types.ObjectId(userId.toString()),
+      },
+    });
+
+    // Stage 2: Populate project details
+    pipeline.push({
+      $lookup: {
+        from: 'projects',
+        localField: 'projectId',
+        foreignField: '_id',
+        as: 'project',
+      },
+    });
+
+    pipeline.push({
+      $unwind: {
+        path: '$project',
+        preserveNullAndEmptyArrays: false,
+      },
+    });
+
+    // Stage 3: Get the last column (done status) from project.columns
+    pipeline.push({
+      $addFields: {
+        doneStatus: { $arrayElemAt: ['$project.columns', -1] },
+      },
+    });
+
+    // Stage 4: Lookup activity logs for each task (STATUS_CHANGED only, within last week)
+    pipeline.push({
+      $lookup: {
+        from: 'activities',
+        let: { taskId: '$_id', doneStatus: '$doneStatus' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$task', '$$taskId'] },
+                  { $eq: ['$action', 'STATUS_CHANGED'] },
+                  { $gte: ['$createdAt', oneWeekAgo] },
+                  { $eq: ['$updatedFields.status.to', '$$doneStatus'] },
+                ],
+              },
+            },
+          },
+          // Sort descending to get the latest status change first
+          { $sort: { createdAt: -1 } },
+          // Take only the last (most recent) transition to done
+          { $limit: 1 },
+        ],
+        as: 'doneActivities',
+      },
+    });
+
+    // Stage 5: Keep only tasks that have at least one "moved to done" activity this week
+    pipeline.push({
+      $addFields: {
+        lastDoneActivity: { $arrayElemAt: ['$doneActivities', 0] },
+      },
+    });
+
+    // Stage 6: Group to get the count of tasks completed this week
+    pipeline.push({
+      $facet: {
+        // All tasks assigned to user (with project populated)
+        allTasks: [
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              key: 1,
+              status: 1,
+              priority: 1,
+              project: {
+                _id: '$project._id',
+                name: '$project.name',
+                prefix: '$project.prefix',
+                columns: '$project.columns',
+              },
+              doneStatus: 1,
+              lastDoneActivity: 1,
+            },
+          },
+        ],
+        allTasksGroupedByProject: [
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              key: 1,
+              status: 1,
+              priority: 1,
+              project: {
+                _id: '$project._id',
+                name: '$project.name',
+                prefix: '$project.prefix',
+                columns: '$project.columns',
+              },
+              doneStatus: 1,
+              lastDoneActivity: 1,
+            },
+          },
+          {
+            $group: {
+              _id: '$project.name',
+              tasks: {
+                $push: {
+                  _id: '$_id',
+                  title: '$title',
+                  key: '$key',
+                  status: '$status',
+                  completedAt: '$completedAt',
+                },
+              },
+            },
+          },
+        ],
+        // Count of tasks that moved to done status in the last week
+        completedThisWeek: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $count: 'count',
+          },
+        ],
+        // Total story points of tasks completed this week
+        storyPointsCompletedThisWeek: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: { $ifNull: ['$storyPoint', 0] } },
+            },
+          },
+        ],
+        // Daily count of tasks completed in the last week
+        tasksCompletedEachDay: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $project: {
+              date: {
+                $dateToString: {
+                  format: '%Y-%m-%d',
+                  date: '$lastDoneActivity.createdAt',
+                },
+              },
+            },
+          },
+          {
+            $group: {
+              _id: '$date',
+              count: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              date: '$_id',
+              count: 1,
+            },
+          },
+          {
+            $sort: { date: 1 },
+          },
+        ],
+        // Detailed list of tasks completed this week
+        completedTasksGroupedByProject: [
+          {
+            $match: {
+              'doneActivities.0': { $exists: true },
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              key: 1,
+              status: 1,
+              projectName: '$project.name',
+              completedAt: '$lastDoneActivity.createdAt',
+            },
+          },
+          {
+            $group: {
+              _id: '$projectName',
+              tasks: {
+                $push: {
+                  _id: '$_id',
+                  title: '$title',
+                  key: '$key',
+                  status: '$status',
+                  completedAt: '$completedAt',
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    // Stage 7: Reshape the output
+    pipeline.push({
+      $project: {
+        totalAssignedTasks: { $size: '$allTasks' },
+        tasksCompletedThisWeek: {
+          $ifNull: [{ $arrayElemAt: ['$completedThisWeek.count', 0] }, 0],
+        },
+        storyPointsCompletedThisWeek: {
+          $ifNull: [
+            { $arrayElemAt: ['$storyPointsCompletedThisWeek.total', 0] },
+            0,
+          ],
+        },
+        tasksCompletedEachDay: {
+          $ifNull: ['$tasksCompletedEachDay', []],
+        },
+        allTasksGroupedByProject: 1,
+        completedTasksGroupedByProject: 1,
+      },
+    });
+
+    const result = await this.taskModel.aggregate<TaskStats>(pipeline).exec();
+
+    console.log(
+      'Task stats aggregation result:',
+      JSON.stringify(result, null, 2),
+    );
+
+    return (
+      result[0] ?? {
+        totalAssignedTasks: 0,
+        tasksCompletedThisWeek: 0,
+        storyPointsCompletedThisWeek: 0,
+        tasksCompletedEachDay: [],
+        allTasksGroupedByProject: [],
+        completedTasksGroupedByProject: [],
+      }
+    );
   }
 }

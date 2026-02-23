@@ -5,6 +5,7 @@ import {
   ApiParam,
   ApiBody,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TASK_PRIORITIES } from 'src/constants/task.constants';
@@ -27,6 +28,50 @@ const TaskIdParam = () =>
 
 export function CreateTaskDocs() {
   return applyDecorators(
+    ApiConsumes('multipart/form-data'),
+    ApiBody({
+      schema: {
+        type: 'object',
+        properties: {
+          projectId: {
+            type: 'string',
+            description: 'ID of the project this task belongs to',
+          },
+          title: { type: 'string', description: 'Title of the task' },
+          description: {
+            type: 'string',
+            description: 'Detailed description of the task',
+          },
+          type: { type: 'string', description: 'Type of the task' },
+          status: { type: 'string', description: 'Current status of the task' },
+          priority: {
+            type: 'string',
+            description: 'Priority level of the task',
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Tags associated with the task',
+          },
+          dueDate: {
+            type: 'string',
+            format: 'date-time',
+            description: 'Due date for the task',
+          },
+          assignee: { type: 'string', description: 'User ID of the assignee' },
+          storyPoint: {
+            type: 'number',
+            description: 'Story points for the task',
+          },
+          attachments: {
+            type: 'array',
+            items: { type: 'string', format: 'binary' },
+            description: 'Optional attachment files (max 10)',
+          },
+        },
+        required: ['projectId', 'title', 'type', 'status'],
+      },
+    }),
     ApiOperation({
       summary: 'Create a new task',
       description:
@@ -165,6 +210,57 @@ export function GetAllTasksDocs() {
     ApiResponse({
       status: 404,
       description: 'Project not found',
+      schema: ErrorResponse,
+    }),
+  );
+}
+
+export function GetTaskStatsDocs(): MethodDecorator {
+  return applyDecorators(
+    ApiOperation({
+      summary: 'Get task stats',
+      description:
+        'Retrieve task statistics for the authenticated user, including total assigned tasks, weekly completed tasks, story points completed, and daily completion counts.',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Task stats retrieved successfully',
+      schema: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          result: {
+            type: 'object',
+            properties: {
+              totalAssignedTasks: { type: 'number', example: 12 },
+              tasksCompletedThisWeek: { type: 'number', example: 4 },
+              storyPointsCompletedThisWeek: { type: 'number', example: 18 },
+              tasksCompletedEachDay: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    date: { type: 'string', example: '2026-02-18' },
+                    count: { type: 'number', example: 2 },
+                  },
+                },
+              },
+              allTasksGroupedByProject: {
+                type: 'array',
+                items: { type: 'object' },
+              },
+              completedTasksGroupedByProject: {
+                type: 'array',
+                items: { type: 'object' },
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
       schema: ErrorResponse,
     }),
   );

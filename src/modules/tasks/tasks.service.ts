@@ -20,7 +20,6 @@ import { NotificationPushService } from '../notification/services/notification-p
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
 import { StorageService } from 'src/storage/storage.service';
-import { Length } from 'class-validator';
 
 @Injectable()
 export class TasksService {

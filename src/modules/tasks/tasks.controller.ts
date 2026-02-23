@@ -13,7 +13,7 @@ import {
   UploadedFiles,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -105,14 +105,12 @@ export class TasksController {
     @Req() req: AuthenticatedRequest,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    const newFileNames = files?.map((file) => file.filename) ?? [];
-
     const result = await this.tasksService.update(
       req.user._id,
       req.user.role,
       id,
       updateTaskDto,
-      newFileNames,
+      files,
     );
     return { success: true, result };
   }

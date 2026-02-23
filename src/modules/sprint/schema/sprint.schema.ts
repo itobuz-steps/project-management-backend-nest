@@ -29,10 +29,15 @@ export class Sprint extends Document {
   projectId: Types.ObjectId;
 
   @Prop({
-    type: Date,
     default: null,
   })
   endDate?: Date;
+
+  createdAt: Date;
+  updatedAt: Date;
+
+  @Prop({ type: Map, of: String, default: {} })
+  taskStatusesAtCompletion: Map<string, string>;
 }
 
 export const SprintSchema = SchemaFactory.createForClass(Sprint);

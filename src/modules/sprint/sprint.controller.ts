@@ -159,9 +159,28 @@ export class SprintController {
   }
 
   @Get(':sprintId/completed-tasks')
-  async getCompletedTasks(@Param('sprintId') sprintId: string) {
-    const { completed } =
+  async getCompletedTasks(
+    @Req() req: AuthenticatedRequest,
+    @Param('sprintId') sprintId: string,
+  ) {
+    const summary =
       await this.sprintService.getSprintCompletionSummary(sprintId);
-    return completed;
+    return {
+      success: true,
+      result: summary,
+    };
+  }
+
+  @Get(':sprintId/moved-to-backlog-tasks')
+  async getTasksMovedToBacklogAtSprintEnd(
+    @Req() req: AuthenticatedRequest,
+    @Param('sprintId') sprintId: string,
+  ) {
+    const tasks =
+      await this.sprintService.getTasksRemovedDuringSprint(sprintId);
+    return {
+      success: true,
+      result: tasks,
+    };
   }
 }

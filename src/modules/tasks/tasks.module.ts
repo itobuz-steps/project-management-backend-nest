@@ -28,5 +28,6 @@ import { ProjectService } from '../project/services/project.service';
     NotificationModule,
     ActivityModule,
   ],
+  exports: [MongooseModule],
 })
 export class TasksModule {}

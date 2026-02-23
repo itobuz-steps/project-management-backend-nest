@@ -114,11 +114,6 @@ export class CreateTaskDto {
     example: ['https://example.com/file.pdf'],
     required: false,
   })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  attachments?: string[];
-
   @ApiProperty({
     description: 'Parent task ID',
     example: '507f1f77bcf86cd799439016',

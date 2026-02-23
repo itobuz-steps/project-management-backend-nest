@@ -302,7 +302,6 @@ async function bootstrap() {
           dueDate: dueDate(rand(-4, 21)),
           assignee: assignee?._id.toString(),
           storyPoint: pick([1, 2, 3, 5, 8]),
-          attachments: sample(UNSPLASH_LINKS, rand(1, 3)),
         };
 
         const task = await tasksService.create(
@@ -310,6 +309,12 @@ async function bootstrap() {
           reporter.role,
           createTaskDto,
         );
+
+        if (Math.random() < 0.3) {
+          task.attachments.push(pick(UNSPLASH_LINKS));
+        }
+
+        await task.save();
 
         createdTaskIds.push(task._id.toString());
 

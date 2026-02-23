@@ -15,9 +15,5 @@ export class CreateCommentDto {
     required: false,
   })
   @IsOptional()
-  @IsString()
-  attachment?: string | null;
-
-  @IsOptional()
   mentions?: string[];
 }

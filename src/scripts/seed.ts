@@ -329,15 +329,19 @@ async function bootstrap() {
               'Looks good; pending QA verification in staging.',
               'Added test coverage for the regression path.',
             ]),
-            attachment: Math.random() < 0.3 ? pick(UNSPLASH_LINKS) : undefined,
           };
 
-          await commentService.create(
+          const comment = await commentService.create(
             author._id,
             author.role,
             task._id.toString(),
             createCommentDto,
           );
+
+          comment.attachment =
+            Math.random() < 0.2 ? pick(UNSPLASH_LINKS) : null;
+
+          await comment.save();
 
           projectCommentCount += 1;
           totalComments += 1;

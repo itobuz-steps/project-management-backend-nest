@@ -51,14 +51,12 @@ export class CommentController {
     @Body() createCommentDto: CreateCommentDto,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    if (file) {
-      createCommentDto.attachment = file.filename;
-    }
     const result = await this.commentService.create(
       req.user._id,
       req.user.role,
       taskId,
       createCommentDto,
+      file,
     );
     return { success: true, result, message: 'Comment created successfully' };
   }

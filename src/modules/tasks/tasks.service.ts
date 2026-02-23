@@ -323,6 +323,7 @@ export class TasksService {
       uploadRes = uploadResults;
     }
 
+    let attachments: string[] = [];
     const urls = uploadRes ? uploadRes.map((res) => res.url) : [];
 
     if (updateTaskDto.existingAttachments || urls.length) {
@@ -338,157 +339,153 @@ export class TasksService {
       }
 
       // Merge with newly uploaded files
-      const attachments = [...keptAttachments, ...urls];
+      attachments = [...keptAttachments, ...urls];
+    }
 
-      if (assignee !== undefined) {
-        updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
+    if (assignee !== undefined) {
+      updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
+    }
+
+    /**
+     * Remove undefined fields
+     */
+    Object.keys(updateData).forEach((key) => {
+      if (updateData[key as keyof UpdateDataType] === undefined) {
+        delete updateData[key as keyof UpdateDataType];
       }
+    });
 
-      /**
-       * Remove undefined fields
-       */
-      Object.keys(updateData).forEach((key) => {
-        if (updateData[key as keyof UpdateDataType] === undefined) {
-          delete updateData[key as keyof UpdateDataType];
-        }
+    /**
+     * Perform Update
+     */
+    const updatedTask = await this.taskModel
+      .findByIdAndUpdate(
+        id,
+        { ...updateData, attachments },
+        {
+          new: true,
+          runValidators: true,
+        },
+      )
+      .populate('assignee', 'name email')
+      .populate('reporter', 'name email');
+
+    /**
+     * Status Change Activity
+     */
+    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+      await this.activityService.logStatusChange({
+        taskId: task._id.toString(),
+        byUserId: userId.toString(),
+        oldStatus: task.status,
+        newStatus: updateTaskDto.status,
       });
+    }
+    if (updateTaskDto.assignee) {
+      const oldAssigneeId = task.assignee?.toString() || null;
+      const newAssigneeId = updateData.assignee?.toString() || null;
 
-      /**
-       * Perform Update
-       */
-      const updatedTask = await this.taskModel
-        .findByIdAndUpdate(
-          id,
-          { ...updateData, attachments },
-          {
-            new: true,
-            runValidators: true,
-          },
-        )
-        .populate('assignee', 'name email')
-        .populate('reporter', 'name email');
+      if (oldAssigneeId !== newAssigneeId) {
+        const newAssignee = updateData.assignee
+          ? await this.projectModel.db.collection('users').findOne(
+              { _id: updateData.assignee },
 
-      /**
-       * Status Change Activity
-       */
-      if (updateTaskDto.status && task.status !== updateTaskDto.status) {
-        await this.activityService.logStatusChange({
+              { projection: { name: 1 } },
+            )
+          : null;
+        console.log('New Assignee Details:', newAssignee);
+
+        await this.activityService.logAssigneeChange({
           taskId: task._id.toString(),
           byUserId: userId.toString(),
-          oldStatus: task.status,
-          newStatus: updateTaskDto.status,
+          newAssigneeId: updateData.assignee?.toString() ?? null,
         });
       }
-      if (updateTaskDto.assignee) {
-        const oldAssigneeId = task.assignee?.toString() || null;
-        const newAssigneeId = updateData.assignee?.toString() || null;
+    }
 
-        if (oldAssigneeId !== newAssigneeId) {
-          const newAssignee = updateData.assignee
-            ? await this.projectModel.db.collection('users').findOne(
-                { _id: updateData.assignee },
+    // Track Other Field Changes
 
-                { projection: { name: 1 } },
-              )
-            : null;
-          console.log('New Assignee Details:', newAssignee);
+    const trackableFields = [
+      ...TRACKABLE_TASK_FIELDS,
+    ] as (keyof UpdateTaskDto)[];
 
-          await this.activityService.logAssigneeChange({
-            taskId: task._id.toString(),
-            byUserId: userId.toString(),
-            newAssigneeId: updateData.assignee?.toString() ?? null,
+    const changes: { field: string; oldValue: string; newValue: string }[] = [];
+
+    for (const field of trackableFields) {
+      if (updateTaskDto[field]) {
+        const oldVal = String(task[field] ?? '');
+        const newVal = String(updateTaskDto[field] ?? '');
+
+        if (oldVal !== newVal) {
+          changes.push({
+            field,
+            oldValue: oldVal,
+            newValue: newVal,
           });
         }
       }
+    }
 
-      // Track Other Field Changes
+    if (changes.length) {
+      await this.activityService.logTaskUpdated({
+        taskId: task._id.toString(),
+        byUserId: userId.toString(),
+        changes,
+      });
+    }
 
-      const trackableFields = [
-        ...TRACKABLE_TASK_FIELDS,
-      ] as (keyof UpdateTaskDto)[];
-
-      const changes: { field: string; oldValue: string; newValue: string }[] =
-        [];
-
-      for (const field of trackableFields) {
-        if (updateTaskDto[field]) {
-          const oldVal = String(task[field] ?? '');
-          const newVal = String(updateTaskDto[field] ?? '');
-
-          if (oldVal !== newVal) {
-            changes.push({
-              field,
-              oldValue: oldVal,
-              newValue: newVal,
-            });
-          }
-        }
-      }
-
-      if (changes.length) {
-        await this.activityService.logTaskUpdated({
-          taskId: task._id.toString(),
-          byUserId: userId.toString(),
-          changes,
+    /**
+     * Notify New Assignee
+     */
+    if (
+      updateData.assignee &&
+      task.assignee?.toString() !== updateData.assignee.toString() &&
+      updateData.assignee.toString() !== userId.toString()
+    ) {
+      this.notificationPushService
+        .pushNotificationToUser(updateTaskDto.assignee as ObjectIdLike, {
+          title: `Task Assigned: "${task.title}"`,
+          message: `You have been assigned to task "${task.title}"`,
+          projectId: task.projectId,
+          taskId: task._id,
+        })
+        .catch((err) => {
+          console.error('Error sending notification for task assignment:', err);
         });
+    }
+
+    /**
+     * Notify Status Change Users
+     */
+    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+      const usersToNotify = new Set<string>();
+
+      if (task.assignee && task.assignee.toString() !== userId.toString()) {
+        usersToNotify.add(task.assignee.toString());
       }
 
-      /**
-       * Notify New Assignee
-       */
-      if (
-        updateData.assignee &&
-        task.assignee?.toString() !== updateData.assignee.toString() &&
-        updateData.assignee.toString() !== userId.toString()
-      ) {
-        this.notificationPushService
-          .pushNotificationToUser(updateTaskDto.assignee as ObjectIdLike, {
-            title: `Task Assigned: "${task.title}"`,
-            message: `You have been assigned to task "${task.title}"`,
+      if (task.reporter.toString() !== userId.toString()) {
+        usersToNotify.add(task.reporter.toString());
+      }
+
+      Promise.all(
+        Array.from(usersToNotify).map((notifyUserId) =>
+          this.notificationPushService.pushNotificationToUser(notifyUserId, {
+            title: `Task Status Updated: "${task.title}"`,
+            message: `Task "${task.title}" status changed from "${task.status}" to "${updateTaskDto.status}"`,
             projectId: task.projectId,
             taskId: task._id,
-          })
-          .catch((err) => {
-            console.error(
-              'Error sending notification for task assignment:',
-              err,
-            );
-          });
-      }
-
-      /**
-       * Notify Status Change Users
-       */
-      if (updateTaskDto.status && task.status !== updateTaskDto.status) {
-        const usersToNotify = new Set<string>();
-
-        if (task.assignee && task.assignee.toString() !== userId.toString()) {
-          usersToNotify.add(task.assignee.toString());
-        }
-
-        if (task.reporter.toString() !== userId.toString()) {
-          usersToNotify.add(task.reporter.toString());
-        }
-
-        Promise.all(
-          Array.from(usersToNotify).map((notifyUserId) =>
-            this.notificationPushService.pushNotificationToUser(notifyUserId, {
-              title: `Task Status Updated: "${task.title}"`,
-              message: `Task "${task.title}" status changed from "${task.status}" to "${updateTaskDto.status}"`,
-              projectId: task.projectId,
-              taskId: task._id,
-            }),
-          ),
-        ).catch((err) => {
-          console.error(
-            'Error sending notifications for task status update:',
-            err,
-          );
-        });
-      }
-
-      return updatedTask;
+          }),
+        ),
+      ).catch((err) => {
+        console.error(
+          'Error sending notifications for task status update:',
+          err,
+        );
+      });
     }
+
+    return updatedTask;
   }
 
   async delete(userId: ObjectIdLike, role: Role, id: string) {

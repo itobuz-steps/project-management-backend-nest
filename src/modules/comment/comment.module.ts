@@ -9,6 +9,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ActivityModule } from '../activity/activity.module';
+import { StorageModule } from 'src/storage/storage.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ActivityModule } from '../activity/activity.module';
     AuthModule,
     NotificationModule,
     ActivityModule,
+    StorageModule,
   ],
   controllers: [CommentController],
   providers: [CommentService],

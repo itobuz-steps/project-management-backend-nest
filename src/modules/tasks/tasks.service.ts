@@ -19,6 +19,7 @@ import {
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class TasksService {
@@ -27,9 +28,15 @@ export class TasksService {
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
     private readonly activityService: ActivityService,
     private readonly notificationPushService: NotificationPushService,
+    private readonly storageService: StorageService,
   ) {}
 
-  async create(userId: ObjectIdLike, role: Role, createTaskDto: CreateTaskDto) {
+  async create(
+    userId: ObjectIdLike,
+    role: Role,
+    createTaskDto: CreateTaskDto,
+    files: Express.Multer.File[] = [],
+  ) {
     const project = await this.checkMembership(
       userId,
       role,
@@ -42,10 +49,23 @@ export class TasksService {
       delete taskData.assignee;
     }
 
+    let uploadRes: Awaited<
+      ReturnType<typeof this.storageService.uploadMultipleFiles>
+    > | null = null;
+
+    if (files && files.length) {
+      const uploadResults =
+        await this.storageService.uploadMultipleFiles(files);
+      uploadRes = uploadResults;
+    }
+
+    console.log(uploadRes);
+
     const newTask = await this.taskModel.create({
       ...taskData,
       reporter: userId,
       key: `${project.prefix}-${project.lastKey + 1}`,
+      attachments: uploadRes ? uploadRes.map((res) => res.url) : [],
     });
 
     project.lastKey += 1;

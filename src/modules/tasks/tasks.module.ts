@@ -9,6 +9,7 @@ import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { NotificationModule } from '../notification/notification.module';
 import { ActivityModule } from '../activity/activity.module';
 import { ProjectService } from '../project/services/project.service';
+import { StorageModule } from 'src/storage/storage.module';
 
 @Module({
   controllers: [TasksController],
@@ -27,6 +28,7 @@ import { ProjectService } from '../project/services/project.service';
     AuthModule,
     NotificationModule,
     ActivityModule,
+    StorageModule,
   ],
 })
 export class TasksModule {}

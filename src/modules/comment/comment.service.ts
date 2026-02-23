@@ -14,6 +14,7 @@ import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class CommentService {
@@ -23,6 +24,7 @@ export class CommentService {
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
     private readonly notificationPushService: NotificationPushService,
     private readonly activityService: ActivityService,
+    private readonly storageService: StorageService,
   ) {}
 
   async getCommentsByTaskId(
@@ -42,11 +44,20 @@ export class CommentService {
     role: Role,
     taskId: ObjectIdLike,
     createCommentDto: CreateCommentDto,
+    file?: Express.Multer.File,
   ): Promise<Comment> {
     const task = await this.checkMembership(userId, role, taskId);
 
+    let attachment: string | null = null;
+
+    if (file) {
+      const uploadResult = await this.storageService.uploadSingleFile(file);
+      attachment = uploadResult.url;
+    }
+
     const newComment = await this.commentModel.create({
       ...createCommentDto,
+      attachment,
       taskId,
       author: userId,
     });

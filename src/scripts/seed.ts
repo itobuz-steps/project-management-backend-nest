@@ -302,7 +302,6 @@ async function bootstrap() {
           dueDate: dueDate(rand(-4, 21)),
           assignee: assignee?._id.toString(),
           storyPoint: pick([1, 2, 3, 5, 8]),
-          attachments: sample(UNSPLASH_LINKS, rand(1, 3)),
         };
 
         const task = await tasksService.create(
@@ -310,6 +309,12 @@ async function bootstrap() {
           reporter.role,
           createTaskDto,
         );
+
+        if (Math.random() < 0.3) {
+          task.attachments.push(pick(UNSPLASH_LINKS));
+        }
+
+        await task.save();
 
         createdTaskIds.push(task._id.toString());
 
@@ -324,15 +329,19 @@ async function bootstrap() {
               'Looks good; pending QA verification in staging.',
               'Added test coverage for the regression path.',
             ]),
-            attachment: Math.random() < 0.3 ? pick(UNSPLASH_LINKS) : undefined,
           };
 
-          await commentService.create(
+          const comment = await commentService.create(
             author._id,
             author.role,
             task._id.toString(),
             createCommentDto,
           );
+
+          comment.attachment =
+            Math.random() < 0.2 ? pick(UNSPLASH_LINKS) : null;
+
+          await comment.save();
 
           projectCommentCount += 1;
           totalComments += 1;

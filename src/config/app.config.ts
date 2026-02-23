@@ -16,6 +16,10 @@ export interface AppConfig {
   OTP_EXPIRATION: number;
   PUBLIC_KEY?: string;
   PRIVATE_KEY?: string;
+  S3_ACCESS_KEY: string;
+  S3_SECRET_ACCESS_KEY: string;
+  S3_REGION: string;
+  S3_BUCKET_NAME: string;
 }
 
 export default registerAs('app', (): AppConfig => {
@@ -30,6 +34,18 @@ export default registerAs('app', (): AppConfig => {
   }
   if (!process.env.INVITE_USER_TOKEN_KEY) {
     throw new Error('Invite user token key is not provided');
+  }
+  if (!process.env.S3_ACCESS_KEY) {
+    throw new Error('S3 access key is not provided');
+  }
+  if (!process.env.S3_SECRET_ACCESS_KEY) {
+    throw new Error('S3 secret access key is not provided');
+  }
+  if (!process.env.S3_REGION) {
+    throw new Error('S3 region is not provided');
+  }
+  if (!process.env.S3_BUCKET_NAME) {
+    throw new Error('S3 bucket name is not provided');
   }
 
   return {
@@ -50,5 +66,9 @@ export default registerAs('app', (): AppConfig => {
     OTP_EXPIRATION: Number(process.env.OTP_EXPIRATION) || 5,
     PUBLIC_KEY: process.env.PUBLIC_KEY,
     PRIVATE_KEY: process.env.PRIVATE_KEY,
+    S3_ACCESS_KEY: process.env.S3_ACCESS_KEY,
+    S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
+    S3_REGION: process.env.S3_REGION,
+    S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
   };
 });

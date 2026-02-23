@@ -15,6 +15,7 @@ import { ActivityModule } from './modules/activity/activity.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
     NotificationModule,
     ActivityModule,
     ScheduleModule.forRoot(),
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailSender],

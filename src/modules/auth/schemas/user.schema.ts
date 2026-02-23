@@ -28,7 +28,7 @@ export class User {
   subscription?: Types.ObjectId | null;
 
   @Prop({ default: true })
-  preferences: boolean;
+  notificationPreferences: boolean;
 
   @Prop({
     enum: Role,

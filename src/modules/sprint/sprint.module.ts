@@ -8,6 +8,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ProjectService } from '../project/services/project.service';
+import { ActivityModule } from '../activity/activity.module';
+import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
   imports: [
@@ -18,6 +20,8 @@ import { ProjectService } from '../project/services/project.service';
     ]),
     JwtModule.register({}),
     AuthModule,
+    ActivityModule,
+    TasksModule,
   ],
   controllers: [SprintController],
   providers: [

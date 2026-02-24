@@ -30,5 +30,6 @@ import { StorageModule } from 'src/storage/storage.module';
     ActivityModule,
     StorageModule,
   ],
+  exports: [MongooseModule],
 })
 export class TasksModule {}

@@ -105,6 +105,16 @@ export class Task extends Document {
     default: null,
   })
   parentTask: Types.ObjectId | null;
+
+  @Prop({
+    type: Date,
+  })
+  createdAt?: Date;
+
+  @Prop({
+    type: Date,
+  })
+  updatedAt?: Date;
 }
 
 export const TaskSchema = SchemaFactory.createForClass(Task);

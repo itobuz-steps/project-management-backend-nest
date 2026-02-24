@@ -1,3 +1,5 @@
+import type { ObjectIdLike } from 'src/type/common.type';
+
 export interface LogTaskCreatedParams {
   taskId: string;
   byUserId: string;
@@ -28,4 +30,10 @@ export interface LogAssigneeChangeParams {
   byUserId: string;
   newAssigneeId?: string | null;
   oldAssigneeId?: string | null;
+}
+
+export interface LogRemovedFromSprintParams {
+  taskId: ObjectIdLike;
+  byUserId: ObjectIdLike;
+  sprintId: ObjectIdLike;
 }

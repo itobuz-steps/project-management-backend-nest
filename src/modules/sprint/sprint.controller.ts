@@ -162,9 +162,12 @@ export class SprintController {
   async getCompletedTasks(
     @Req() req: AuthenticatedRequest,
     @Param('sprintId') sprintId: string,
+    @Param('projectId') projectId: string,
   ) {
-    const summary =
-      await this.sprintService.getSprintCompletionSummary(sprintId);
+    const summary = await this.sprintService.getSprintCompletionSummary(
+      sprintId,
+      projectId,
+    );
     return {
       success: true,
       result: summary,

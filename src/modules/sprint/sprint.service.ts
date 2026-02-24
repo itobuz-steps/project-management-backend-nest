@@ -139,20 +139,17 @@ export class SprintService {
       throw new ForbiddenException('Unauthorized');
     }
 
-    // Check if the sprint is being marked as completed
     if (update.isCompleted && !sprint.isCompleted) {
       const taskIds = sprint.tasks || [];
       const tasks = await this.taskModel.find({ _id: { $in: taskIds } }).lean();
 
-      // Save the current statuses of tasks
       const taskStatusesAtCompletion = new Map<string, string>();
       tasks.forEach((task) => {
         taskStatusesAtCompletion.set(task._id.toString(), task.status);
       });
 
-      // Add the task statuses to the update object
       update['taskStatusesAtCompletion'] = taskStatusesAtCompletion;
-      update['endDate'] = new Date(); // Set the sprint end date
+      update['endDate'] = new Date();
     }
 
     const updatedSprint = await this.sprintModel.findByIdAndUpdate(
@@ -165,11 +162,15 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    this.notificationPushService.pushNotificationToProjectMembers(project._id, {
-      title: `Sprint ${sprint.key} Updated`,
-      message: `Sprint ${sprint.key} has been updated`,
-      projectId: project._id,
-    });
+    this.notificationPushService
+      .pushNotificationToProjectMembers(project._id, {
+        title: `Sprint ${sprint.key} Updated`,
+        message: `Sprint ${sprint.key} has been updated`,
+        projectId: project._id,
+      })
+      .catch((err) => {
+        console.error('Failed to send notification:', err);
+      });
 
     return updatedSprint;
   }
@@ -242,14 +243,15 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    this.notificationPushService.pushNotificationToProjectMembers(
-      updatedSprint.projectId,
-      {
+    this.notificationPushService
+      .pushNotificationToProjectMembers(updatedSprint.projectId, {
         title: `${tasks.length} task(s) added to sprint ${updatedSprint.key}`,
         message: `${tasks.length} task(s) added to sprint ${updatedSprint.key}`,
         projectId: updatedSprint.projectId,
-      },
-    );
+      })
+      .catch((err) => {
+        console.error('Failed to send notification:', err);
+      });
 
     return updatedSprint;
   }
@@ -317,37 +319,38 @@ export class SprintService {
       throw new ForbiddenException('Sprint not completed');
     }
 
-    // 1️⃣ Find removals for THIS sprint only
     const removedActivities = await this.activityModel.find({
       action: ActivityAction.REMOVED_FROM_SPRINT,
-      'updatedFields.sprint.from': sprintId, // no toString needed
+      'updatedFields.sprint.from': sprintId,
       createdAt: {
         $gte: sprint.createdAt,
         $lte: sprint.endDate,
       },
     });
 
-    console.log('Removed activities:', removedActivities.length);
+    if (!removedActivities.length) {
+      return [];
+    }
 
-    if (!removedActivities.length) return [];
-
-    // 2️⃣ Unique task IDs
     const removedTaskIds = [...new Set(removedActivities.map((a) => a.task))];
 
-    // 3️⃣ Exclude tasks still inside sprint at completion
     const finalRemovedTaskIds = removedTaskIds.filter(
       (taskId) =>
-        !sprint.tasks.some((t) => t.toString() === taskId._id?.toString()),
+        !sprint.tasks.some(
+          (task) => task.toString() === taskId._id?.toString(),
+        ),
     );
 
-    if (!finalRemovedTaskIds.length) return [];
+    if (!finalRemovedTaskIds.length) {
+      return [];
+    }
 
     return this.taskModel.find({
       _id: { $in: finalRemovedTaskIds.map((task) => task._id) },
     });
   }
 
-  async getSprintCompletionSummary(sprintId: string) {
+  async getSprintCompletionSummary(sprintId: string, projectId: string) {
     const sprint = await this.sprintModel.findById(sprintId);
 
     if (!sprint) {
@@ -358,31 +361,33 @@ export class SprintService {
       throw new ForbiddenException('Sprint is not completed');
     }
 
+    const project = await this.projectModel.findById(projectId);
+
+    if (!project || !project.columns?.length) {
+      throw new ForbiddenException('Project workflow not configured');
+    }
+
+    const lastColumn = project.columns[project.columns.length - 1];
+
     const taskStatusesAtCompletion =
       sprint.taskStatusesAtCompletion || new Map();
 
     const completed: Task[] = [];
     const pending: Task[] = [];
-    const unknown: Task[] = [];
 
     const taskIds = Array.from(taskStatusesAtCompletion.keys());
+
     const tasks = await this.taskModel.find({ _id: { $in: taskIds } }).lean();
 
     for (const task of tasks) {
       const statusAtEnd = taskStatusesAtCompletion.get(task._id.toString());
 
-      if (!statusAtEnd) {
-        unknown.push(task);
-        continue;
-      }
-
-      if (/done|completed|closed/i.test(statusAtEnd)) {
+      if (statusAtEnd === lastColumn) {
         completed.push(task);
       } else {
         pending.push(task);
       }
     }
-
-    return { completed, pending, unknown };
+    return { completed, pending };
   }
 }

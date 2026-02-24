@@ -109,12 +109,6 @@ export class CreateTaskDto {
   subTask?: string[];
 
   @ApiProperty({
-    description: 'Attachment file URLs or IDs',
-    type: [String],
-    example: ['https://example.com/file.pdf'],
-    required: false,
-  })
-  @ApiProperty({
     description: 'Parent task ID',
     example: '507f1f77bcf86cd799439016',
     required: false,
@@ -122,4 +116,48 @@ export class CreateTaskDto {
   @IsOptional()
   @IsMongoId()
   parentTask?: string;
+
+  @ApiProperty({
+    description: 'IDs of tasks that this task blocks',
+    type: [String],
+    example: ['507f1f77bcf86cd799439017'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  blocks?: string[];
+
+  @ApiProperty({
+    description: 'IDs of tasks that block this task',
+    type: [String],
+    example: ['507f1f77bcf86cd799439018'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  blockedBy?: string[];
+
+  @ApiProperty({
+    description: 'IDs of related tasks',
+    type: [String],
+    example: ['507f1f77bcf86cd799439019'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  relatesTo?: string[];
+
+  @ApiProperty({
+    description: 'IDs of duplicate tasks',
+    type: [String],
+    example: ['507f1f77bcf86cd799439020'],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsMongoId({ each: true })
+  duplicates?: string[];
 }

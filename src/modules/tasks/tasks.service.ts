@@ -480,37 +480,25 @@ export class TasksService {
       }
     });
 
-    let updatedTask: HydratedDocument<Task> | null = null;
+    const updatePayload = attachments.length
+      ? { ...updateData, attachments }
+      : updateData;
 
-    if (attachments.length) {
-      updatedTask = await this.taskModel
-        .findByIdAndUpdate(
-          id,
-          { ...updateData, attachments },
-          {
-            new: true,
-            runValidators: true,
-          },
-        )
-        .populate('assignee', 'name email profileImage')
-        .populate('reporter', 'name email profileImage')
-        .populate('blocks', 'title key status')
-        .populate('blockedBy', 'title key status')
-        .populate('relatesTo', 'title key status')
-        .populate('duplicates', 'title key status');
-    } else {
-      updatedTask = await this.taskModel
-        .findByIdAndUpdate(id, updateData, {
-          new: true,
-          runValidators: true,
-        })
-        .populate('assignee', 'name email profileImage')
-        .populate('reporter', 'name email profileImage')
-        .populate('blocks', 'title key status')
-        .populate('blockedBy', 'title key status')
-        .populate('relatesTo', 'title key status')
-        .populate('duplicates', 'title key status');
-    }
+    const taskPopulate = [
+      { path: 'assignee', select: 'name email profileImage' },
+      { path: 'reporter', select: 'name email profileImage' },
+      { path: 'blocks', select: 'title key status' },
+      { path: 'blockedBy', select: 'title key status' },
+      { path: 'relatesTo', select: 'title key status' },
+      { path: 'duplicates', select: 'title key status' },
+    ];
+
+    const updatedTask = await this.taskModel
+      .findByIdAndUpdate(id, updatePayload, {
+        new: true,
+        runValidators: true,
+      })
+      .populate(taskPopulate);
 
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
       await this.activityService.logStatusChange({

@@ -45,7 +45,7 @@ export class NotificationPushService {
       profileImage: payload.profileImage,
     });
 
-    if (user.subscription) {
+    if (user.notificationPreferences.push && user.subscription) {
       await this.webPushService.sendNotification(user.subscription, {
         ...payload,
         createdAt: notification.createdAt,
@@ -69,10 +69,14 @@ export class NotificationPushService {
       throw new NotFoundException('Project not found');
     }
 
-    const memberIds = project.members.map((member) => member.user.toString());
+    const memberIds = project.members.map((member) => member.user);
+
+    const users = await this.userModel.find({
+      _id: { $in: memberIds },
+    });
 
     await Promise.all(
-      memberIds.map((userId) => this.pushNotificationToUser(userId, payload)),
+      users.map((user) => this.pushNotificationToUser(user._id, payload)),
     );
   }
 }

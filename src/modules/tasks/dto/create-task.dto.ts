@@ -106,7 +106,7 @@ export class CreateTaskDto {
   @IsOptional()
   @IsArray()
   @IsMongoId({ each: true })
-  subTask?: string[];
+  subTasks?: string[];
 
   @ApiProperty({
     description: 'Parent task ID',

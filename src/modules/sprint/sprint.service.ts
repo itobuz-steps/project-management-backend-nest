@@ -16,7 +16,11 @@ import {
   ProjectAccessParams,
   SprintIdParams,
   SprintAccessParams,
+  ProjectNotificationPayload,
+  ProjectEmailPayload,
 } from './type/sprint.types';
+import { MailService } from 'src/utils/sendVerificationMail';
+import { User } from '../auth/schemas/user.schema';
 
 @Injectable()
 export class SprintService {
@@ -25,9 +29,52 @@ export class SprintService {
     private readonly sprintModel: Model<Sprint>,
     @InjectModel(Project.name)
     private readonly projectModel: Model<Project>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<User>,
 
+    private readonly mailService: MailService,
     private readonly notificationPushService: NotificationPushService,
   ) {}
+
+  private async notifyProjectMembersWithEmail(
+    project: Project,
+    payload: ProjectNotificationPayload,
+    emailPayload?: ProjectEmailPayload,
+  ) {
+    try {
+      await this.notificationPushService.pushNotificationToProjectMembers(
+        project._id,
+        payload,
+      );
+
+      // 📧 Email
+      if (emailPayload) {
+        const memberIds = project.members.map((m) => m.user);
+
+        const users = await this.userModel.find({
+          _id: { $in: memberIds },
+          'notificationPreferences.email': true,
+        });
+
+        void Promise.all(
+          users.map((user) =>
+            this.mailService.sendNotificationMail(
+              user.email,
+              emailPayload.subject,
+              {
+                title: emailPayload.title,
+                message: payload.message,
+                highlightText: emailPayload.highlightText,
+                projectName: project.name,
+              },
+            ),
+          ),
+        );
+      }
+    } catch (err) {
+      console.error('Sprint notification error:', err);
+    }
+  }
 
   async getAllSprints(): Promise<Sprint[]> {
     return this.sprintModel.find();
@@ -98,12 +145,17 @@ export class SprintService {
     await sprint.save();
     await project.save();
 
-    await this.notificationPushService.pushNotificationToProjectMembers(
-      project._id,
+    void this.notifyProjectMembersWithEmail(
+      project,
       {
         title: `Sprint ${sprint.key} Created`,
         message: `Sprint ${sprint.key} has been created`,
         projectId: project._id,
+      },
+      {
+        subject: `Sprint Created`,
+        title: `Sprint ${sprint.key} Created`,
+        highlightText: `Sprint ${sprint.key}`,
       },
     );
 
@@ -142,12 +194,16 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    await this.notificationPushService.pushNotificationToProjectMembers(
-      project._id,
+    void this.notifyProjectMembersWithEmail(
+      project,
       {
         title: `Sprint ${sprint.key} Updated`,
         message: `Sprint ${sprint.key} has been updated`,
         projectId: project._id,
+      },
+      {
+        subject: `Sprint Updated`,
+        title: `Sprint ${sprint.key} Updated`,
       },
     );
 
@@ -175,12 +231,16 @@ export class SprintService {
 
     await sprint.deleteOne();
 
-    await this.notificationPushService.pushNotificationToProjectMembers(
-      project._id,
+    void this.notifyProjectMembersWithEmail(
+      project,
       {
         title: `Sprint ${sprint.key} Deleted`,
         message: `Sprint ${sprint.key} has been deleted`,
         projectId: project._id,
+      },
+      {
+        subject: `Sprint Deleted`,
+        title: `Sprint ${sprint.key} Deleted`,
       },
     );
 
@@ -222,12 +282,17 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    await this.notificationPushService.pushNotificationToProjectMembers(
-      sprint.projectId,
+    void this.notifyProjectMembersWithEmail(
+      project,
       {
         title: `${tasks.length} task(s) added to sprint ${updatedSprint.key}`,
         message: `${tasks.length} task(s) added to sprint ${updatedSprint.key}`,
-        projectId: sprint.projectId,
+        projectId: project._id,
+      },
+      {
+        subject: `Tasks Added to Sprint`,
+        title: `Tasks Added to ${updatedSprint.key}`,
+        highlightText: `${tasks.length} task(s) added`,
       },
     );
 
@@ -266,13 +331,16 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    await this.notificationPushService.pushNotificationToProjectMembers(
-      sprint.projectId,
+    void this.notifyProjectMembersWithEmail(
+      project,
       {
         title: `Task Removed from sprint ${updatedSprint.key}`,
         message: `A task was removed from sprint ${updatedSprint.key}`,
-        projectId: sprint.projectId,
-        taskId,
+        projectId: project._id,
+      },
+      {
+        subject: `Task Removed from Sprint`,
+        title: `Task Removed from ${updatedSprint.key}`,
       },
     );
 

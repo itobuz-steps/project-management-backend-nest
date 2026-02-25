@@ -41,7 +41,9 @@ export class NotificationCronService {
 
       for await (const task of overdueTasks) {
         const project = await this.projectModel.findById(task.projectId);
-        if (!project) continue;
+        if (!project) {
+          continue;
+        }
 
         const payload = {
           title: `Overdue Reminder for Task ${task.key} of ${project.name}`,
@@ -50,45 +52,36 @@ export class NotificationCronService {
           taskId: task._id,
         };
 
-        const assigneeId = task.assignee;
-        const reporterId = task.reporter;
+        const assignee = task.assignee
+          ? await this.userModel.findById(task.assignee)
+          : null;
 
-        if (
-          assigneeId &&
-          reporterId &&
-          assigneeId.toString() !== reporterId.toString()
-        ) {
-          await this.pushService.pushNotificationToUser(assigneeId, payload);
-          await this.pushService.pushNotificationToUser(reporterId, payload);
+        const reporter = task.reporter
+          ? await this.userModel.findById(task.reporter)
+          : null;
 
-          const assignee = assigneeId
-            ? await this.userModel.findById(assigneeId)
-            : null;
+        if (assignee) {
+          await this.pushService.pushNotificationToUser(assignee._id, payload);
 
-          const reporter = reporterId
-            ? await this.userModel.findById(reporterId)
-            : null;
-
-          if (assignee?.email) {
+          if (assignee.notificationPreferences?.email && assignee.email) {
             await this.mailService.sendTaskOverdueMail(
               assignee.email,
               task.title,
               project.name,
             );
           }
+        }
 
-          if (
-            reporter?.email &&
-            assigneeId?.toString() !== reporterId?.toString()
-          ) {
+        if (reporter && reporter._id.toString() !== assignee?._id.toString()) {
+          await this.pushService.pushNotificationToUser(reporter._id, payload);
+
+          if (reporter.notificationPreferences?.email && reporter.email) {
             await this.mailService.sendTaskOverdueMail(
               reporter.email,
               task.title,
               project.name,
             );
           }
-        } else if (reporterId) {
-          await this.pushService.pushNotificationToUser(reporterId, payload);
         }
       }
     } catch (error) {

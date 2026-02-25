@@ -16,3 +16,16 @@ export interface SprintAccessParams {
 export interface SprintIdParams extends ProjectAccessParams {
   sprintId: ObjectIdLike;
 }
+
+export interface ProjectNotificationPayload {
+  title: string;
+  message: string;
+  projectId: ObjectIdLike;
+  taskId?: ObjectIdLike;
+}
+
+export interface ProjectEmailPayload {
+  subject: string;
+  title: string;
+  highlightText?: string;
+}

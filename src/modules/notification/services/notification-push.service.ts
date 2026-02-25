@@ -45,11 +45,7 @@ export class NotificationPushService {
       profileImage: payload.profileImage,
     });
 
-    if (!user.notificationPreferences) {
-      return notification;
-    }
-
-    if (user.subscription) {
+    if (user.notificationPreferences.push && user.subscription) {
       await this.webPushService.sendNotification(user.subscription, {
         ...payload,
         createdAt: notification.createdAt,
@@ -77,7 +73,6 @@ export class NotificationPushService {
 
     const users = await this.userModel.find({
       _id: { $in: memberIds },
-      notificationPreferences: true,
     });
 
     await Promise.all(

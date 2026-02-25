@@ -10,6 +10,7 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ActivityModule } from '../activity/activity.module';
 import { StorageModule } from 'src/storage/storage.module';
+import { User, UserSchema } from '../auth/schemas/user.schema';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { StorageModule } from 'src/storage/storage.module';
       { name: Comment.name, schema: CommentSchema },
       { name: Task.name, schema: TaskSchema },
       { name: Project.name, schema: ProjectSchema },
+      { name: User.name, schema: UserSchema },
     ]),
     JwtModule.register({}),
     AuthModule,

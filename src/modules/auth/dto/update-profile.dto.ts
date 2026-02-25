@@ -13,15 +13,41 @@ export class UpdateProfileDto {
   profileImage?: string;
 
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) => {
+  @Transform(({ value }) => {
     if (value === 'true') {
       return true;
     }
     if (value === 'false') {
       return false;
     }
-    return value;
+    return undefined;
   })
   @IsBoolean()
-  notificationPreferences?: boolean;
+  push?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') {
+      return true;
+    }
+    if (value === 'false') {
+      return false;
+    }
+    return undefined;
+  })
+  @IsBoolean()
+  email?: boolean;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') {
+      return true;
+    }
+    if (value === 'false') {
+      return false;
+    }
+    return undefined;
+  })
+  @IsBoolean()
+  inApp?: boolean;
 }

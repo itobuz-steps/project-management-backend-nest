@@ -27,8 +27,19 @@ export class User {
   @Prop({ type: Types.ObjectId, ref: 'Subscription', default: null })
   subscription?: Types.ObjectId | null;
 
-  @Prop({ default: true })
-  notificationPreferences: boolean;
+  @Prop({
+    type: {
+      email: { type: Boolean, default: true },
+      push: { type: Boolean, default: true },
+      inApp: { type: Boolean, default: true },
+    },
+    default: {},
+  })
+  notificationPreferences: {
+    email: boolean;
+    push: boolean;
+    inApp: boolean;
+  };
 
   @Prop({
     enum: Role,

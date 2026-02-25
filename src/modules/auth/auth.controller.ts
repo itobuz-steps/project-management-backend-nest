@@ -292,9 +292,16 @@ export class AuthController {
       updateData.name = updateProfileDto.name;
     }
 
-    if (typeof updateProfileDto.notificationPreferences === 'boolean') {
-      updateData.notificationPreferences =
-        updateProfileDto.notificationPreferences;
+    if (typeof updateProfileDto.push === 'boolean') {
+      updateData['notificationPreferences.push'] = updateProfileDto.push;
+    }
+
+    if (typeof updateProfileDto.email === 'boolean') {
+      updateData['notificationPreferences.email'] = updateProfileDto.email;
+    }
+
+    if (typeof updateProfileDto.inApp === 'boolean') {
+      updateData['notificationPreferences.inApp'] = updateProfileDto.inApp;
     }
 
     if (profileImage) {

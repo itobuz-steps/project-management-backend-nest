@@ -9,6 +9,8 @@ import { AuthModule } from '../auth/auth.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ProjectService } from '../project/services/project.service';
 import { User, UserSchema } from '../auth/schemas/user.schema';
+import { ActivityModule } from '../activity/activity.module';
+import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
     ]),
     JwtModule.register({}),
     AuthModule,
+    ActivityModule,
+    TasksModule,
   ],
   controllers: [SprintController],
   providers: [

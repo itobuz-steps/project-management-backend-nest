@@ -32,5 +32,6 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
     ActivityModule,
     StorageModule,
   ],
+  exports: [MongooseModule],
 })
 export class TasksModule {}

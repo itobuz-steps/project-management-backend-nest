@@ -6,6 +6,9 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Sprint } from './schema/sprint.schema';
+import { Task } from '../tasks/entities/task.entity';
+import { Activity } from '../activity/schemas/activity.schemas';
+import { ActivityAction } from '../activity/type/activity.types';
 import { Project } from '../project/schema/project.schema';
 import { ObjectIdLike } from 'src/type/common.type';
 import { CreateSprintDto } from './dto/create-sprint.dto';
@@ -21,6 +24,7 @@ import {
 } from './type/sprint.types';
 import { MailService } from 'src/utils/sendVerificationMail';
 import { User } from '../auth/schemas/user.schema';
+import { ActivityService } from '../activity/services/activity.service';
 
 @Injectable()
 export class SprintService {
@@ -31,9 +35,12 @@ export class SprintService {
     private readonly projectModel: Model<Project>,
     @InjectModel(User.name)
     private readonly userModel: Model<User>,
+    @InjectModel(Task.name) private readonly taskModel: Model<Task>,
+    @InjectModel(Activity.name) private readonly activityModel: Model<Activity>,
 
     private readonly mailService: MailService,
     private readonly notificationPushService: NotificationPushService,
+    private readonly activityService: ActivityService,
   ) {}
 
   private async notifyProjectMembersWithEmail(
@@ -182,6 +189,19 @@ export class SprintService {
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
+    }
+
+    if (update.isCompleted && !sprint.isCompleted) {
+      const taskIds = sprint.tasks || [];
+      const tasks = await this.taskModel.find({ _id: { $in: taskIds } }).lean();
+
+      const taskStatusesAtCompletion = new Map<string, string>();
+      tasks.forEach((task) => {
+        taskStatusesAtCompletion.set(task._id.toString(), task.status);
+      });
+
+      update['taskStatusesAtCompletion'] = taskStatusesAtCompletion;
+      update['endDate'] = new Date();
     }
 
     const updatedSprint = await this.sprintModel.findByIdAndUpdate(
@@ -344,6 +364,95 @@ export class SprintService {
       },
     );
 
+    await this.activityService.logRemovedFromSprint({
+      taskId,
+      byUserId: userId,
+      sprintId: updatedSprint._id,
+    });
+
     return updatedSprint;
+  }
+
+  async getTasksRemovedDuringSprint(sprintId: string) {
+    const sprint = await this.sprintModel.findById(sprintId);
+
+    if (!sprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    if (!sprint.endDate) {
+      throw new ForbiddenException('Sprint not completed');
+    }
+
+    const removedActivities = await this.activityModel.find({
+      action: ActivityAction.REMOVED_FROM_SPRINT,
+      'updatedFields.sprint.from': sprintId,
+      createdAt: {
+        $gte: sprint.createdAt,
+        $lte: sprint.endDate,
+      },
+    });
+
+    if (!removedActivities.length) {
+      return [];
+    }
+
+    const removedTaskIds = [...new Set(removedActivities.map((a) => a.task))];
+
+    const finalRemovedTaskIds = removedTaskIds.filter(
+      (taskId) =>
+        !sprint.tasks.some(
+          (task) => task.toString() === taskId._id?.toString(),
+        ),
+    );
+
+    if (!finalRemovedTaskIds.length) {
+      return [];
+    }
+
+    return this.taskModel.find({
+      _id: { $in: finalRemovedTaskIds.map((task) => task._id) },
+    });
+  }
+
+  async getSprintCompletionSummary(sprintId: string, projectId: string) {
+    const sprint = await this.sprintModel.findById(sprintId);
+
+    if (!sprint) {
+      throw new NotFoundException('Sprint not found');
+    }
+
+    if (!sprint.isCompleted) {
+      throw new ForbiddenException('Sprint is not completed');
+    }
+
+    const project = await this.projectModel.findById(projectId);
+
+    if (!project || !project.columns?.length) {
+      throw new ForbiddenException('Project workflow not configured');
+    }
+
+    const lastColumn = project.columns[project.columns.length - 1];
+
+    const taskStatusesAtCompletion =
+      sprint.taskStatusesAtCompletion || new Map();
+
+    const completed: Task[] = [];
+    const pending: Task[] = [];
+
+    const taskIds = Array.from(taskStatusesAtCompletion.keys());
+
+    const tasks = await this.taskModel.find({ _id: { $in: taskIds } }).lean();
+
+    for (const task of tasks) {
+      const statusAtEnd = taskStatusesAtCompletion.get(task._id.toString());
+
+      if (statusAtEnd === lastColumn) {
+        completed.push(task);
+      } else {
+        pending.push(task);
+      }
+    }
+    return { completed, pending };
   }
 }

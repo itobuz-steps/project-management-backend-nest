@@ -117,11 +117,13 @@ export class AuthService {
 
   async updateProfile(
     userId: ObjectIdLike,
-    updateData: { name?: string; profileImage?: string },
+    updateData: Record<string, unknown>,
   ): Promise<UserDocument> {
-    const user = await this.userModel.findByIdAndUpdate(userId, updateData, {
-      new: true,
-    });
+    const user = await this.userModel.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true },
+    );
 
     if (!user) {
       throw new NotFoundException('User not found');

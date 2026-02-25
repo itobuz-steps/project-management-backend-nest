@@ -34,3 +34,15 @@ export interface TaskStats {
   allTasksGroupedByProject: Record<string, Task[]>;
   completedTasksGroupedByProject: Record<string, Task[]>;
 }
+
+export interface ProjectNotificationPayload {
+  title: string;
+  message: string;
+  projectId: ObjectIdLike;
+  taskId?: ObjectIdLike;
+}
+
+export interface UserEmailPayload {
+  projectName?: string;
+  highlightText?: string;
+}

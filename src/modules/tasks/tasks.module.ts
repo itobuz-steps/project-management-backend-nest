@@ -10,6 +10,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { ActivityModule } from '../activity/activity.module';
 import { ProjectService } from '../project/services/project.service';
 import { StorageModule } from 'src/storage/storage.module';
+import { User, UserSchema } from '../auth/schemas/user.schema';
 
 @Module({
   controllers: [TasksController],
@@ -24,11 +25,13 @@ import { StorageModule } from 'src/storage/storage.module';
   imports: [
     MongooseModule.forFeature([{ name: Task.name, schema: TaskSchema }]),
     MongooseModule.forFeature([{ name: Project.name, schema: ProjectSchema }]),
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     JwtModule.register({}),
     AuthModule,
     NotificationModule,
     ActivityModule,
     StorageModule,
   ],
+  exports: [MongooseModule],
 })
 export class TasksModule {}

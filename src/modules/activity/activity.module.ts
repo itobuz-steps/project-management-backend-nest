@@ -18,6 +18,6 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
   ],
   controllers: [ActivityController],
   providers: [ActivityService],
-  exports: [ActivityService],
+  exports: [ActivityService, MongooseModule],
 })
 export class ActivityModule {}

@@ -15,6 +15,8 @@ import { NotificationPushService } from '../notification/services/notification-p
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
 import { StorageService } from 'src/storage/storage.service';
+import { User } from '../auth/schemas/user.schema';
+import { MailService } from 'src/utils/sendVerificationMail';
 
 @Injectable()
 export class CommentService {
@@ -22,9 +24,11 @@ export class CommentService {
     @InjectModel(Comment.name) private readonly commentModel: Model<Comment>,
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly notificationPushService: NotificationPushService,
     private readonly activityService: ActivityService,
     private readonly storageService: StorageService,
+    private readonly mailService: MailService,
   ) {}
 
   async getCommentsByTaskId(
@@ -92,17 +96,41 @@ export class CommentService {
       });
     }
 
-    // Send notifications
-    Promise.all(
-      Array.from(usersToNotify).map((notifyUserId) =>
-        this.notificationPushService.pushNotificationToUser(notifyUserId, {
-          title: `New Comment on "${task.title}"`,
-          message: `${userId.toString() === notifyUserId ? 'You were mentioned in a comment' : 'A new comment was added'}`,
-          projectId: task.projectId,
-          taskId: task._id,
-        }),
-      ),
-    ).catch((err) => console.error('Error sending notifications:', err));
+    void Promise.all(
+      Array.from(usersToNotify).map(async (notifyUserId) => {
+        try {
+          await this.notificationPushService.pushNotificationToUser(
+            notifyUserId,
+            {
+              title: `New Comment on "${task.title}"`,
+              message: `${userId.toString() === notifyUserId ? 'You were mentioned in a comment' : 'A new comment was added'}`,
+              projectId: task.projectId,
+              taskId: task._id,
+            },
+          );
+
+          const user = await this.userModel.findById(notifyUserId);
+
+          if (user?.notificationPreferences?.email && user.email) {
+            const project = await this.projectModel.findById(task.projectId);
+            const author = await this.userModel.findById(userId);
+
+            await this.mailService.sendNotificationMail(
+              user.email,
+              `New Comment on "${task.title}"`,
+              {
+                title: `New Comment on "${task.title}"`,
+                message: `${author?.name} commented on a task.`,
+                highlightText: createCommentDto.message,
+                projectName: project?.name,
+              },
+            );
+          }
+        } catch (err) {
+          console.error('Notification error:', err);
+        }
+      }),
+    );
 
     return newComment;
   }
@@ -153,16 +181,41 @@ export class CommentService {
     );
 
     if (addedMentions.length) {
-      Promise.all(
-        addedMentions.map((mentionedUserId) =>
-          this.notificationPushService.pushNotificationToUser(mentionedUserId, {
-            title: `You were mentioned in a comment "${task.title}"'`,
-            message: 'You were mentioned in an edited comment',
-            taskId: comment.taskId,
-            projectId: task.projectId,
-          }),
-        ),
-      ).catch((err) => console.error('Error sending notifications:', err));
+      void Promise.all(
+        addedMentions.map(async (mentionedUserId) => {
+          try {
+            await this.notificationPushService.pushNotificationToUser(
+              mentionedUserId,
+              {
+                title: `You were mentioned in a comment "${task.title}"`,
+                message: 'You were mentioned in an edited comment',
+                taskId: comment.taskId,
+                projectId: task.projectId,
+              },
+            );
+
+            const user = await this.userModel.findById(mentionedUserId);
+
+            if (user?.notificationPreferences?.email && user.email) {
+              const commenter = await this.userModel.findById(userId);
+              const project = await this.projectModel.findById(task.projectId);
+
+              await this.mailService.sendNotificationMail(
+                user.email,
+                `New Comment on "${task.title}"`,
+                {
+                  title: `New Comment on "${task.title}"`,
+                  message: `${commenter?.name} commented on a task.`,
+                  highlightText: updateCommentDto.message,
+                  projectName: project?.name,
+                },
+              );
+            }
+          } catch (err) {
+            console.error('Error sending mention notification:', err);
+          }
+        }),
+      );
     }
 
     return updatedComment!;

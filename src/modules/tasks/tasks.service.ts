@@ -12,24 +12,62 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Project } from '../project/schema/project.schema';
 import type { ObjectIdLike } from 'src/type/common.type';
 import {
+  ProjectNotificationPayload,
   TaskFilters,
   TaskStats,
   TRACKABLE_TASK_FIELDS,
+  UserEmailPayload,
 } from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
 import { StorageService } from 'src/storage/storage.service';
+import { User } from '../auth/schemas/user.schema';
+import { MailService } from 'src/utils/sendVerificationMail';
 
 @Injectable()
 export class TasksService {
   constructor(
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
+    @InjectModel(User.name) private readonly userModel: Model<User>,
     private readonly activityService: ActivityService,
     private readonly notificationPushService: NotificationPushService,
     private readonly storageService: StorageService,
+    private readonly mailService: MailService,
   ) {}
+
+  private async notifyUserWithPreferences(
+    userId: ObjectIdLike,
+    payload: ProjectNotificationPayload,
+    emailPayload?: UserEmailPayload,
+  ) {
+    try {
+      await this.notificationPushService.pushNotificationToUser(
+        userId,
+        payload,
+      );
+
+      if (emailPayload) {
+        const user = await this.userModel.findById(userId);
+
+        if (user?.notificationPreferences?.email && user.email) {
+          await this.mailService.sendNotificationMail(
+            user.email,
+            payload.title,
+            {
+              title: payload.message,
+              message: payload.message,
+              highlightText: emailPayload.highlightText,
+              projectName: emailPayload.projectName,
+            },
+          );
+        }
+      }
+    } catch (err) {
+      console.error('Notification error:', err);
+    }
+  }
 
   async create(
     userId: ObjectIdLike,
@@ -90,19 +128,18 @@ export class TasksService {
 
     // Send notification to assignee if task is assigned
     if (newTask.assignee && newTask.assignee.toString() !== userId.toString()) {
-      this.notificationPushService
-        .pushNotificationToUser(newTask.assignee, {
+      void this.notifyUserWithPreferences(
+        newTask.assignee,
+        {
           title: `New Task Assigned: "${newTask.title}"`,
           message: `You have been assigned to task "${newTask.title}" in project "${project.name}"`,
           projectId: newTask.projectId,
           taskId: newTask._id,
-        })
-        .catch((err) => {
-          console.error(
-            'Error sending notification for new task assignment:',
-            err,
-          );
-        });
+        },
+        {
+          projectName: project.name,
+        },
+      );
     }
 
     return newTask;
@@ -298,9 +335,6 @@ export class TasksService {
 
     await this.checkMembership(userId, role, task.projectId);
 
-    /**
-     * Build safe update payload (DB shape, not DTO shape)
-     */
     type UpdateDataType = Omit<UpdateTaskDto, 'assignee'> & {
       assignee?: Types.ObjectId | null;
     };
@@ -346,18 +380,12 @@ export class TasksService {
       updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
     }
 
-    /**
-     * Remove undefined fields
-     */
     Object.keys(updateData).forEach((key) => {
       if (updateData[key as keyof UpdateDataType] === undefined) {
         delete updateData[key as keyof UpdateDataType];
       }
     });
 
-    /**
-     * Perform Update
-     */
     const updatedTask = await this.taskModel
       .findByIdAndUpdate(
         id,
@@ -370,9 +398,6 @@ export class TasksService {
       .populate('assignee', 'name email')
       .populate('reporter', 'name email');
 
-    /**
-     * Status Change Activity
-     */
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
       await this.activityService.logStatusChange({
         taskId: task._id.toString(),
@@ -403,8 +428,6 @@ export class TasksService {
       }
     }
 
-    // Track Other Field Changes
-
     const trackableFields = [
       ...TRACKABLE_TASK_FIELDS,
     ] as (keyof UpdateTaskDto)[];
@@ -434,29 +457,26 @@ export class TasksService {
       });
     }
 
-    /**
-     * Notify New Assignee
-     */
     if (
       updateData.assignee &&
       task.assignee?.toString() !== updateData.assignee.toString() &&
       updateData.assignee.toString() !== userId.toString()
     ) {
-      this.notificationPushService
-        .pushNotificationToUser(updateTaskDto.assignee as ObjectIdLike, {
+      void this.notifyUserWithPreferences(
+        updateTaskDto.assignee as ObjectIdLike,
+        {
           title: `Task Assigned: "${task.title}"`,
           message: `You have been assigned to task "${task.title}"`,
           projectId: task.projectId,
           taskId: task._id,
-        })
-        .catch((err) => {
-          console.error('Error sending notification for task assignment:', err);
-        });
+        },
+        {
+          projectName:
+            (await this.projectModel.findById(task.projectId))?.name || '',
+        },
+      );
     }
 
-    /**
-     * Notify Status Change Users
-     */
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
       const usersToNotify = new Set<string>();
 
@@ -468,21 +488,24 @@ export class TasksService {
         usersToNotify.add(task.reporter.toString());
       }
 
-      Promise.all(
-        Array.from(usersToNotify).map((notifyUserId) =>
-          this.notificationPushService.pushNotificationToUser(notifyUserId, {
-            title: `Task Status Updated: "${task.title}"`,
-            message: `Task "${task.title}" status changed from "${task.status}" to "${updateTaskDto.status}"`,
-            projectId: task.projectId,
-            taskId: task._id,
-          }),
-        ),
-      ).catch((err) => {
-        console.error(
-          'Error sending notifications for task status update:',
-          err,
-        );
-      });
+      void Promise.all(
+        Array.from(usersToNotify).map(async (notifyUserId) => {
+          const project = await this.projectModel.findById(task.projectId);
+
+          return this.notifyUserWithPreferences(
+            notifyUserId,
+            {
+              title: `Task Status Updated: "${task.title}"`,
+              message: `Task "${task.title}" status changed from "${task.status}" to "${updateTaskDto.status}"`,
+              projectId: task.projectId,
+              taskId: task._id,
+            },
+            {
+              projectName: project?.name || '',
+            },
+          );
+        }),
+      );
     }
 
     return updatedTask;
@@ -506,17 +529,23 @@ export class TasksService {
       usersToNotify.add(task.reporter.toString());
     }
 
-    Promise.all(
-      Array.from(usersToNotify).map((notifyUserId) =>
-        this.notificationPushService.pushNotificationToUser(notifyUserId, {
-          title: `Task Deleted: "${task.title}"`,
-          message: `Task "${task.title}" has been deleted`,
-          projectId: task.projectId,
-        }),
-      ),
-    ).catch((err) => {
-      console.error('Error sending notifications for task deletion:', err);
-    });
+    void Promise.all(
+      Array.from(usersToNotify).map(async (notifyUserId) => {
+        const project = await this.projectModel.findById(task.projectId);
+
+        return this.notifyUserWithPreferences(
+          notifyUserId,
+          {
+            title: `Task Deleted: "${task.title}"`,
+            message: `Task "${task.title}" has been deleted`,
+            projectId: task.projectId,
+          },
+          {
+            projectName: project?.name || '',
+          },
+        );
+      }),
+    );
 
     const deletedTask = await this.taskModel
       .findByIdAndDelete(id)

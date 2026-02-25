@@ -263,6 +263,15 @@ export class TasksService {
         localField: 'assignee',
         foreignField: '_id',
         as: 'assignee',
+        pipeline: [
+          {
+            $project: {
+              name: 1,
+              email: 1,
+              profileImage: 1,
+            },
+          },
+        ],
       },
     });
     pipeline.push({
@@ -279,6 +288,15 @@ export class TasksService {
         localField: 'reporter',
         foreignField: '_id',
         as: 'reporter',
+        pipeline: [
+          {
+            $project: {
+              name: 1,
+              email: 1,
+              profileImage: 1,
+            },
+          },
+        ],
       },
     });
     pipeline.push({
@@ -287,6 +305,78 @@ export class TasksService {
         preserveNullAndEmptyArrays: true,
       },
     });
+
+    // Populate related task references
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'relatesTo',
+          foreignField: '_id',
+          as: 'relatesTo',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'blocks',
+          foreignField: '_id',
+          as: 'blocks',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'blockedBy',
+          foreignField: '_id',
+          as: 'blockedBy',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'duplicates',
+          foreignField: '_id',
+          as: 'duplicates',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+    );
 
     const result =
       await this.taskModel.aggregate<HydratedDocument<Task>>(pipeline);
@@ -297,8 +387,12 @@ export class TasksService {
   async findOne(userId: ObjectIdLike, role: Role, id: string) {
     const task = await this.taskModel
       .findById(id)
-      .populate('assignee', 'name email')
-      .populate('reporter', 'name email');
+      .populate('assignee', 'name email profileImage')
+      .populate('reporter', 'name email profileImage')
+      .populate('blocks', 'title key status')
+      .populate('blockedBy', 'title key status')
+      .populate('relatesTo', 'title key status')
+      .populate('duplicates', 'title key status');
 
     if (!task) {
       throw new NotFoundException('Task not found');
@@ -386,17 +480,25 @@ export class TasksService {
       }
     });
 
+    const updatePayload = attachments.length
+      ? { ...updateData, attachments }
+      : updateData;
+
+    const taskPopulate = [
+      { path: 'assignee', select: 'name email profileImage' },
+      { path: 'reporter', select: 'name email profileImage' },
+      { path: 'blocks', select: 'title key status' },
+      { path: 'blockedBy', select: 'title key status' },
+      { path: 'relatesTo', select: 'title key status' },
+      { path: 'duplicates', select: 'title key status' },
+    ];
+
     const updatedTask = await this.taskModel
-      .findByIdAndUpdate(
-        id,
-        { ...updateData, attachments },
-        {
-          new: true,
-          runValidators: true,
-        },
-      )
-      .populate('assignee', 'name email')
-      .populate('reporter', 'name email');
+      .findByIdAndUpdate(id, updatePayload, {
+        new: true,
+        runValidators: true,
+      })
+      .populate(taskPopulate);
 
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
       await this.activityService.logStatusChange({

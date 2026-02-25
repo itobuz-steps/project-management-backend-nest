@@ -106,15 +106,37 @@ export class Task extends Document {
   })
   parentTask: Types.ObjectId | null;
 
-  @Prop({
-    type: Date,
-  })
-  createdAt?: Date;
+  @Prop([
+    {
+      type: MongooseSchema.Types.ObjectId,
+      ref: 'Task',
+    },
+  ])
+  blocks: Types.ObjectId[];
 
-  @Prop({
-    type: Date,
-  })
-  updatedAt?: Date;
+  @Prop([
+    {
+      type: MongooseSchema.Types.ObjectId,
+      ref: 'Task',
+    },
+  ])
+  blockedBy: Types.ObjectId[];
+
+  @Prop([
+    {
+      type: MongooseSchema.Types.ObjectId,
+      ref: 'Task',
+    },
+  ])
+  relatesTo: Types.ObjectId[];
+
+  @Prop([
+    {
+      type: MongooseSchema.Types.ObjectId,
+      ref: 'Task',
+    },
+  ])
+  duplicates: Types.ObjectId[];
 }
 
 export const TaskSchema = SchemaFactory.createForClass(Task);

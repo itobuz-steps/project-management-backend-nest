@@ -13,7 +13,7 @@ import {
   UploadedFiles,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
@@ -95,23 +95,22 @@ export class TasksController {
 
   @Patch(':id')
   @UpdateTaskDocs()
+  @UseInterceptors(
+    FilesInterceptor('attachments', 10, multerOptionsForMultipleFiles),
+  )
+  @ApiConsumes('multipart/form-data')
   async update(
     @Param('id') id: string,
     @Body() updateTaskDto: UpdateTaskDto,
     @Req() req: AuthenticatedRequest,
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    console.log(
-      'CONTROLLER - Raw body received:',
-      JSON.stringify(updateTaskDto, null, 2),
-    );
-    console.log('CONTROLLER - Has assignee?', 'assignee' in updateTaskDto);
-    console.log('CONTROLLER - assignee value:', updateTaskDto.assignee);
-
     const result = await this.tasksService.update(
       req.user._id,
       req.user.role,
       id,
       updateTaskDto,
+      files,
     );
     return { success: true, result };
   }

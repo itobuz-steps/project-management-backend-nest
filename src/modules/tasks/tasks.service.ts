@@ -419,6 +419,7 @@ export class TasksService {
     role: Role,
     id: ObjectIdLike,
     updateTaskDto: UpdateTaskDto,
+    newFiles: Express.Multer.File[] = [],
   ) {
     const task = await this.taskModel.findById(id);
 
@@ -438,6 +439,37 @@ export class TasksService {
       ...rest,
     };
 
+    delete updateData['existingAttachments'];
+
+    let uploadRes: Awaited<
+      ReturnType<typeof this.storageService.uploadMultipleFiles>
+    > | null = null;
+
+    if (newFiles.length) {
+      const uploadResults =
+        await this.storageService.uploadMultipleFiles(newFiles);
+      uploadRes = uploadResults;
+    }
+
+    let attachments: string[] = [];
+    const urls = uploadRes ? uploadRes.map((res) => res.url) : [];
+
+    if (updateTaskDto.existingAttachments || urls.length) {
+      const currentAttachments = task.attachments ?? [];
+      // Determine which existing attachments to keep
+      let keptAttachments: string[];
+      if (updateTaskDto.existingAttachments) {
+        keptAttachments = updateTaskDto.existingAttachments.filter(
+          (f: string) => currentAttachments.includes(f),
+        );
+      } else {
+        keptAttachments = [...currentAttachments];
+      }
+
+      // Merge with newly uploaded files
+      attachments = [...keptAttachments, ...urls];
+    }
+
     if (assignee !== undefined) {
       updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
     }
@@ -448,17 +480,37 @@ export class TasksService {
       }
     });
 
-    const updatedTask = await this.taskModel
-      .findByIdAndUpdate(id, updateData, {
-        new: true,
-        runValidators: true,
-      })
-      .populate('assignee', 'name email profileImage')
-      .populate('reporter', 'name email profileImage')
-      .populate('blocks', 'title key status')
-      .populate('blockedBy', 'title key status')
-      .populate('relatesTo', 'title key status')
-      .populate('duplicates', 'title key status');
+    let updatedTask: HydratedDocument<Task> | null = null;
+
+    if (attachments.length) {
+      updatedTask = await this.taskModel
+        .findByIdAndUpdate(
+          id,
+          { ...updateData, attachments },
+          {
+            new: true,
+            runValidators: true,
+          },
+        )
+        .populate('assignee', 'name email profileImage')
+        .populate('reporter', 'name email profileImage')
+        .populate('blocks', 'title key status')
+        .populate('blockedBy', 'title key status')
+        .populate('relatesTo', 'title key status')
+        .populate('duplicates', 'title key status');
+    } else {
+      updatedTask = await this.taskModel
+        .findByIdAndUpdate(id, updateData, {
+          new: true,
+          runValidators: true,
+        })
+        .populate('assignee', 'name email profileImage')
+        .populate('reporter', 'name email profileImage')
+        .populate('blocks', 'title key status')
+        .populate('blockedBy', 'title key status')
+        .populate('relatesTo', 'title key status')
+        .populate('duplicates', 'title key status');
+    }
 
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
       await this.activityService.logStatusChange({

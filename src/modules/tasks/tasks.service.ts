@@ -288,6 +288,78 @@ export class TasksService {
       },
     });
 
+    // Populate related task references
+    pipeline.push(
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'relatesTo',
+          foreignField: '_id',
+          as: 'relatesTo',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'blocks',
+          foreignField: '_id',
+          as: 'blocks',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'blockedBy',
+          foreignField: '_id',
+          as: 'blockedBy',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $lookup: {
+          from: 'tasks',
+          localField: 'duplicates',
+          foreignField: '_id',
+          as: 'duplicates',
+          pipeline: [
+            {
+              $project: {
+                title: 1,
+                key: 1,
+                status: 1,
+              },
+            },
+          ],
+        },
+      },
+    );
+
     const result =
       await this.taskModel.aggregate<HydratedDocument<Task>>(pipeline);
 
@@ -298,7 +370,11 @@ export class TasksService {
     const task = await this.taskModel
       .findById(id)
       .populate('assignee', 'name email')
-      .populate('reporter', 'name email');
+      .populate('reporter', 'name email')
+      .populate('blocks', 'title key status')
+      .populate('blockedBy', 'title key status')
+      .populate('relatesTo', 'title key status')
+      .populate('duplicates', 'title key status');
 
     if (!task) {
       throw new NotFoundException('Task not found');
@@ -360,7 +436,11 @@ export class TasksService {
         runValidators: true,
       })
       .populate('assignee', 'name email')
-      .populate('reporter', 'name email');
+      .populate('reporter', 'name email')
+      .populate('blocks', 'title key status')
+      .populate('blockedBy', 'title key status')
+      .populate('relatesTo', 'title key status')
+      .populate('duplicates', 'title key status');
 
     if (updateTaskDto.status && task.status !== updateTaskDto.status) {
       await this.activityService.logStatusChange({

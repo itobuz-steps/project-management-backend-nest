@@ -263,6 +263,15 @@ export class TasksService {
         localField: 'assignee',
         foreignField: '_id',
         as: 'assignee',
+        pipeline: [
+          {
+            $project: {
+              name: 1,
+              email: 1,
+              profileImage: 1,
+            },
+          },
+        ],
       },
     });
     pipeline.push({
@@ -279,6 +288,15 @@ export class TasksService {
         localField: 'reporter',
         foreignField: '_id',
         as: 'reporter',
+        pipeline: [
+          {
+            $project: {
+              name: 1,
+              email: 1,
+              profileImage: 1,
+            },
+          },
+        ],
       },
     });
     pipeline.push({
@@ -369,8 +387,8 @@ export class TasksService {
   async findOne(userId: ObjectIdLike, role: Role, id: string) {
     const task = await this.taskModel
       .findById(id)
-      .populate('assignee', 'name email')
-      .populate('reporter', 'name email')
+      .populate('assignee', 'name email profileImage')
+      .populate('reporter', 'name email profileImage')
       .populate('blocks', 'title key status')
       .populate('blockedBy', 'title key status')
       .populate('relatesTo', 'title key status')
@@ -435,8 +453,8 @@ export class TasksService {
         new: true,
         runValidators: true,
       })
-      .populate('assignee', 'name email')
-      .populate('reporter', 'name email')
+      .populate('assignee', 'name email profileImage')
+      .populate('reporter', 'name email profileImage')
       .populate('blocks', 'title key status')
       .populate('blockedBy', 'title key status')
       .populate('relatesTo', 'title key status')

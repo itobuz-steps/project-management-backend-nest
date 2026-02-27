@@ -320,6 +320,7 @@ export class TasksService {
                 title: 1,
                 key: 1,
                 status: 1,
+                type: 1,
               },
             },
           ],
@@ -337,6 +338,7 @@ export class TasksService {
                 title: 1,
                 key: 1,
                 status: 1,
+                type: 1,
               },
             },
           ],
@@ -354,6 +356,7 @@ export class TasksService {
                 title: 1,
                 key: 1,
                 status: 1,
+                type: 1,
               },
             },
           ],
@@ -371,6 +374,7 @@ export class TasksService {
                 title: 1,
                 key: 1,
                 status: 1,
+                type: 1,
               },
             },
           ],
@@ -389,10 +393,10 @@ export class TasksService {
       .findById(id)
       .populate('assignee', 'name email profileImage')
       .populate('reporter', 'name email profileImage')
-      .populate('blocks', 'title key status')
-      .populate('blockedBy', 'title key status')
-      .populate('relatesTo', 'title key status')
-      .populate('duplicates', 'title key status');
+      .populate('blocks', 'title key status type')
+      .populate('blockedBy', 'title key status type')
+      .populate('relatesTo', 'title key status type')
+      .populate('duplicates', 'title key status type');
 
     if (!task) {
       throw new NotFoundException('Task not found');
@@ -454,7 +458,7 @@ export class TasksService {
     let attachments: string[] = [];
     const urls = uploadRes ? uploadRes.map((res) => res.url) : [];
 
-    if (updateTaskDto.existingAttachments || urls.length) {
+    if (updateTaskDto.existingAttachments?.length || urls.length) {
       const currentAttachments = task.attachments ?? [];
       // Determine which existing attachments to keep
       let keptAttachments: string[];
@@ -480,17 +484,15 @@ export class TasksService {
       }
     });
 
-    const updatePayload = attachments.length
-      ? { ...updateData, attachments }
-      : updateData;
+    const updatePayload = { ...updateData, attachments };
 
     const taskPopulate = [
       { path: 'assignee', select: 'name email profileImage' },
       { path: 'reporter', select: 'name email profileImage' },
-      { path: 'blocks', select: 'title key status' },
-      { path: 'blockedBy', select: 'title key status' },
-      { path: 'relatesTo', select: 'title key status' },
-      { path: 'duplicates', select: 'title key status' },
+      { path: 'blocks', select: 'title key status type' },
+      { path: 'blockedBy', select: 'title key status type' },
+      { path: 'relatesTo', select: 'title key status type' },
+      { path: 'duplicates', select: 'title key status type' },
     ];
 
     const updatedTask = await this.taskModel

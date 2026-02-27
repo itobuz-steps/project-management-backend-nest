@@ -12,12 +12,21 @@ import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../../notification/services/notification-push.service';
 import { Role } from '../../auth/types/auth.types';
+import { Task } from '../../tasks/entities/task.entity';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
 
 @Injectable()
 export class ProjectService {
   constructor(
     @InjectModel(Project.name)
     private readonly projectModel: Model<Project>,
+
+    @InjectModel('Task')
+    private readonly taskModel: Model<Task>,
+
+    @InjectConnection()
+    private readonly connection: Connection,
 
     private readonly notificationPushService: NotificationPushService,
   ) {}
@@ -181,6 +190,70 @@ export class ProjectService {
     );
 
     await project.deleteOne();
+
+    return project;
+  }
+
+  async deleteColumn(
+    userId: ObjectIdLike,
+    role: Role,
+    projectId: ObjectIdLike,
+    columnName: string,
+  ): Promise<Project> {
+    if (role !== Role.SUPERADMIN) {
+      throw new ForbiddenException('Only superadmin can delete columns');
+    }
+
+    const project = await this.projectModel.findOne({
+      _id: projectId,
+      members: {
+        $elemMatch: {
+          user: userId,
+          role: 'admin',
+        },
+      },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project by given id not found');
+    }
+
+    if (!project.columns.includes(columnName)) {
+      throw new NotFoundException('Column by given name not found');
+    }
+
+    // Start a session for transaction
+    const session = await this.connection.startSession();
+    session.startTransaction();
+
+    try {
+      // Remove the column from the project
+      project.columns = project.columns.filter((col) => col !== columnName);
+      await project.save({ session });
+
+      // Update tasks that have the deleted column as their status
+      await this.taskModel.updateMany(
+        { project: projectId, status: columnName },
+        { $set: { status: project.columns[0] } },
+        { session },
+      );
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+    await this.notificationPushService.pushNotificationToProjectMembers(
+      project._id,
+      {
+        title: `Column "${columnName}" Deleted`,
+        message: `Column "${columnName}" was deleted from project "${project.name}"`,
+        projectId: project._id,
+      },
+    );
 
     return project;
   }

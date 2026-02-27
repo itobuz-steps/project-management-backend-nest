@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsString,
   IsOptional,
@@ -10,6 +11,11 @@ import {
 } from 'class-validator';
 import { TASK_PRIORITIES, TASK_TYPES } from '../../../constants/task.constants';
 import type { TaskPriority, TaskType } from '../../../constants/task.constants';
+import {
+  transformNullableMongoId,
+  transformToMongoIdArray,
+} from 'src/utils/transform.utils';
+
 export class CreateTaskDto {
   @ApiProperty({
     description: 'ID of the project this task belongs to',
@@ -104,6 +110,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformToMongoIdArray)
   @IsArray()
   @IsMongoId({ each: true })
   subTasks?: string[];
@@ -114,8 +121,9 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformNullableMongoId)
   @IsMongoId()
-  parentTask?: string;
+  parentTask?: string | null;
 
   @ApiProperty({
     description: 'IDs of tasks that this task blocks',
@@ -124,6 +132,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformToMongoIdArray)
   @IsArray()
   @IsMongoId({ each: true })
   blocks?: string[];
@@ -135,6 +144,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformToMongoIdArray)
   @IsArray()
   @IsMongoId({ each: true })
   blockedBy?: string[];
@@ -146,6 +156,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformToMongoIdArray)
   @IsArray()
   @IsMongoId({ each: true })
   relatesTo?: string[];
@@ -157,6 +168,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformToMongoIdArray)
   @IsArray()
   @IsMongoId({ each: true })
   duplicates?: string[];

@@ -220,7 +220,7 @@ export class ProjectService {
       status: columnName,
     });
 
-    if (taskCount > 0) {
+    if (taskCount) {
       throw new BadRequestException(
         `Cannot delete column "${columnName}" because it contains ${taskCount} task(s).`,
       );

@@ -97,8 +97,6 @@ export class TasksService {
       uploadRes = uploadResults;
     }
 
-    console.log(uploadRes);
-
     const newTask = await this.taskModel.create({
       ...taskData,
       reporter: userId,
@@ -515,15 +513,6 @@ export class TasksService {
       const newAssigneeId = updateData.assignee?.toString() || null;
 
       if (oldAssigneeId !== newAssigneeId) {
-        const newAssignee = updateData.assignee
-          ? await this.projectModel.db.collection('users').findOne(
-              { _id: updateData.assignee },
-
-              { projection: { name: 1 } },
-            )
-          : null;
-        console.log('New Assignee Details:', newAssignee);
-
         await this.activityService.logAssigneeChange({
           taskId: task._id.toString(),
           byUserId: userId.toString(),
@@ -689,8 +678,6 @@ export class TasksService {
   }
 
   async getStats(userId: ObjectIdLike) {
-    console.log('Getting task stats for user:', userId);
-
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
@@ -933,11 +920,6 @@ export class TasksService {
     });
 
     const result = await this.taskModel.aggregate<TaskStats>(pipeline).exec();
-
-    console.log(
-      'Task stats aggregation result:',
-      JSON.stringify(result, null, 2),
-    );
 
     return (
       result[0] ?? {

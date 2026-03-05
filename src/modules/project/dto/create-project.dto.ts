@@ -1,4 +1,10 @@
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsMongoId,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { ProjectType } from '../type/project.types';
 
 export class CreateProjectDto {
@@ -15,4 +21,8 @@ export class CreateProjectDto {
   @IsOptional()
   @IsArray()
   columns?: string[];
+
+  @IsOptional()
+  @IsMongoId()
+  workspaceId?: string;
 }

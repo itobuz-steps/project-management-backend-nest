@@ -144,11 +144,15 @@ export class TasksService {
   }
 
   async findAll(userId: ObjectIdLike, role: Role, filter: TaskFilters = {}) {
-    const pipeline: PipelineStage[] = [];
+    const page = Number(filter.page || 0);
+    const limit = Number(filter.limit || 100);
+    const skip = (page - 1) * limit;
+
+    const matchPipeline: PipelineStage[] = [];
 
     if (role === Role.SUPERADMIN) {
       if (filter.projectId) {
-        pipeline.push({
+        matchPipeline.push({
           $match: {
             projectId: new mongoose.Types.ObjectId(filter.projectId),
           },
@@ -156,7 +160,7 @@ export class TasksService {
       } else {
         const projectIds = await this.projectModel.find({}, { _id: 1 });
 
-        pipeline.push({
+        matchPipeline.push({
           $match: { projectId: { $in: projectIds.map((p) => p._id) } },
         });
       }
@@ -173,7 +177,7 @@ export class TasksService {
           );
         }
 
-        pipeline.push({
+        matchPipeline.push({
           $match: {
             projectId: new mongoose.Types.ObjectId(filter.projectId),
           },
@@ -183,14 +187,14 @@ export class TasksService {
           { 'members.user': userId },
           { _id: 1 },
         );
-        pipeline.push({
+        matchPipeline.push({
           $match: { projectId: { $in: projectIds.map((p) => p._id) } },
         });
       }
     }
 
     if (filter.searchQuery) {
-      pipeline.push({
+      matchPipeline.push({
         $match: {
           $or: [
             { title: { $regex: filter.searchQuery, $options: 'i' } },
@@ -202,7 +206,7 @@ export class TasksService {
     }
 
     if (filter.priority) {
-      pipeline.push({
+      matchPipeline.push({
         $match: {
           priority: filter.priority,
         },
@@ -210,7 +214,7 @@ export class TasksService {
     }
 
     if (filter.status) {
-      pipeline.push({
+      matchPipeline.push({
         $match: {
           status: filter.status,
         },
@@ -218,13 +222,13 @@ export class TasksService {
     }
 
     if (filter.tags instanceof Array && filter.tags && filter.tags.length) {
-      pipeline.push({
+      matchPipeline.push({
         $match: {
           tags: { $in: filter.tags },
         },
       });
     } else if (typeof filter.tags === 'string' && filter.tags.length) {
-      pipeline.push({
+      matchPipeline.push({
         $match: {
           tags: { $in: [filter.tags] },
         },
@@ -232,30 +236,38 @@ export class TasksService {
     }
 
     if (filter.assignee) {
-      pipeline.push({
+      matchPipeline.push({
         $match: {
           assignee: new mongoose.Types.ObjectId(filter.assignee),
         },
       });
     }
 
-    if (filter.sortBy) {
-      const sortOrder = filter.sortOrder === 'asc' ? 1 : -1;
-      pipeline.push({
-        $sort: {
-          [filter.sortBy]: sortOrder,
-        },
-      });
-    } else {
-      pipeline.push({
-        $sort: {
-          createdAt: -1,
-        },
-      });
-    }
+    const sortStage: PipelineStage = filter.sortBy
+      ? {
+          $sort: {
+            [filter.sortBy]: filter.sortOrder === 'asc' ? 1 : -1,
+          },
+        }
+      : {
+          $sort: {
+            createdAt: -1,
+          },
+        };
+
+    const paginationStages: PipelineStage[] = [
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+    ];
+
+    const populateStages: PipelineStage[] = [];
 
     // Populate assignee
-    pipeline.push({
+    populateStages.push({
       $lookup: {
         from: 'users',
         localField: 'assignee',
@@ -272,7 +284,7 @@ export class TasksService {
         ],
       },
     });
-    pipeline.push({
+    populateStages.push({
       $unwind: {
         path: '$assignee',
         preserveNullAndEmptyArrays: true,
@@ -280,7 +292,7 @@ export class TasksService {
     });
 
     // Populate reporter
-    pipeline.push({
+    populateStages.push({
       $lookup: {
         from: 'users',
         localField: 'reporter',
@@ -297,7 +309,7 @@ export class TasksService {
         ],
       },
     });
-    pipeline.push({
+    populateStages.push({
       $unwind: {
         path: '$reporter',
         preserveNullAndEmptyArrays: true,
@@ -305,7 +317,7 @@ export class TasksService {
     });
 
     // Populate related task references
-    pipeline.push(
+    populateStages.push(
       {
         $lookup: {
           from: 'tasks',
@@ -380,10 +392,35 @@ export class TasksService {
       },
     );
 
-    const result =
-      await this.taskModel.aggregate<HydratedDocument<Task>>(pipeline);
+    const [result, totalCountResult] = await Promise.all([
+      this.taskModel.aggregate<HydratedDocument<Task>>([
+        ...matchPipeline,
+        sortStage,
+        ...paginationStages,
+        ...populateStages,
+      ]),
+      this.taskModel.aggregate<{ total: number }>([
+        ...matchPipeline,
+        {
+          $count: 'total',
+        },
+      ]),
+    ]);
 
-    return result;
+    const total = totalCountResult[0]?.total ?? 0;
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+
+    return {
+      data: result,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    };
   }
 
   async findOne(userId: ObjectIdLike, role: Role, id: string) {

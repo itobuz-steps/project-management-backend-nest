@@ -181,17 +181,47 @@ export function GetAllTasksDocs() {
       example: '507f1f77bcf86cd799439011',
       type: String,
     }),
+    ApiQuery({
+      name: 'page',
+      required: false,
+      description: 'Page number (1-indexed)',
+      example: 1,
+      type: Number,
+    }),
+    ApiQuery({
+      name: 'limit',
+      required: false,
+      description: 'Number of tasks per page',
+      example: 10,
+      type: Number,
+    }),
     ApiResponse({
       status: 200,
-      description: 'Successfully retrieved list of tasks',
+      description: 'Successfully retrieved paginated list of tasks',
       schema: {
         type: 'object',
         properties: {
           success: { type: 'boolean', example: true },
           result: {
-            type: 'array',
-            items: {
-              type: 'object',
+            type: 'object',
+            properties: {
+              data: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                },
+              },
+              pagination: {
+                type: 'object',
+                properties: {
+                  page: { type: 'number', example: 1 },
+                  limit: { type: 'number', example: 10 },
+                  total: { type: 'number', example: 42 },
+                  totalPages: { type: 'number', example: 5 },
+                  hasNextPage: { type: 'boolean', example: true },
+                  hasPrevPage: { type: 'boolean', example: false },
+                },
+              },
             },
           },
         },

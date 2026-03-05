@@ -11,6 +11,17 @@ export interface TaskFilters {
   status?: string;
   tags?: string[] | string;
   assignee?: ObjectIdLike;
+  page?: number | string;
+  limit?: number | string;
+}
+
+export interface TaskPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
 }
 
 export const TRACKABLE_TASK_FIELDS = [

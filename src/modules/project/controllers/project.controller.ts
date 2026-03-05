@@ -112,4 +112,22 @@ export class ProjectController {
       message: 'Project successfully deleted',
     };
   }
+
+  @Delete(':projectId/columns/:columnName')
+  async deleteColumn(
+    @Param('projectId') projectId: string,
+    @Param('columnName') columnName: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    return {
+      success: true,
+      result: await this.projectService.deleteColumn(
+        req.user._id,
+        req.user.role,
+        projectId,
+        columnName,
+      ),
+      message: 'Column successfully deleted',
+    };
+  }
 }

@@ -10,6 +10,7 @@ import { InviteUserController } from './controllers/invite-user.controller';
 import { InviteUserService } from './services/invite-user.service';
 import { NotificationModule } from '../notification/notification.module';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
     ]),
     JwtModule.register({}),
     AuthModule,
+    TasksModule,
   ],
   controllers: [ProjectController, InviteUserController],
   providers: [

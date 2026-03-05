@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -12,12 +13,21 @@ import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../../notification/services/notification-push.service';
 import { Role } from '../../auth/types/auth.types';
+import { Task } from '../../tasks/entities/task.entity';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
 
 @Injectable()
 export class ProjectService {
   constructor(
     @InjectModel(Project.name)
     private readonly projectModel: Model<Project>,
+
+    @InjectModel('Task')
+    private readonly taskModel: Model<Task>,
+
+    @InjectConnection()
+    private readonly connection: Connection,
 
     private readonly notificationPushService: NotificationPushService,
   ) {}
@@ -181,6 +191,44 @@ export class ProjectService {
     );
 
     await project.deleteOne();
+
+    return project;
+  }
+
+  async deleteColumn(
+    userId: ObjectIdLike,
+    role: Role,
+    projectId: ObjectIdLike,
+    columnName: string,
+  ): Promise<Project> {
+    if (role !== Role.SUPERADMIN) {
+      throw new ForbiddenException('Only superadmin can delete columns');
+    }
+
+    const project = await this.projectModel.findById(projectId);
+
+    if (!project) {
+      throw new NotFoundException('Project by given id not found');
+    }
+
+    if (!project.columns.includes(columnName)) {
+      throw new NotFoundException('Column not found');
+    }
+
+    const taskCount = await this.taskModel.countDocuments({
+      projectId: projectId,
+      status: columnName,
+    });
+
+    if (taskCount) {
+      throw new BadRequestException(
+        `Cannot delete column "${columnName}" because it contains ${taskCount} task(s).`,
+      );
+    }
+    // If no tasks, safe to delete
+    project.columns = project.columns.filter((col) => col !== columnName);
+
+    await project.save();
 
     return project;
   }

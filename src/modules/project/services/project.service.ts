@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -204,56 +205,30 @@ export class ProjectService {
       throw new ForbiddenException('Only superadmin can delete columns');
     }
 
-    const project = await this.projectModel.findOne({
-      _id: projectId,
-      members: {
-        $elemMatch: {
-          user: userId,
-          role: 'admin',
-        },
-      },
-    });
+    const project = await this.projectModel.findById(projectId);
 
     if (!project) {
       throw new NotFoundException('Project by given id not found');
     }
 
     if (!project.columns.includes(columnName)) {
-      throw new NotFoundException('Column by given name not found');
+      throw new NotFoundException('Column not found');
     }
 
-    // Start a session for transaction
-    const session = await this.connection.startSession();
-    session.startTransaction();
+    const taskCount = await this.taskModel.countDocuments({
+      projectId: projectId,
+      status: columnName,
+    });
 
-    try {
-      // Remove the column from the project
-      project.columns = project.columns.filter((col) => col !== columnName);
-      await project.save({ session });
-
-      // Update tasks that have the deleted column as their status
-      await this.taskModel.updateMany(
-        { project: projectId, status: columnName },
-        { $set: { status: project.columns[0] } },
-        { session },
+    if (taskCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete column "${columnName}" because it contains ${taskCount} task(s).`,
       );
-
-      await session.commitTransaction();
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
     }
+    // If no tasks, safe to delete
+    project.columns = project.columns.filter((col) => col !== columnName);
 
-    await this.notificationPushService.pushNotificationToProjectMembers(
-      project._id,
-      {
-        title: `Column "${columnName}" Deleted`,
-        message: `Column "${columnName}" was deleted from project "${project.name}"`,
-        projectId: project._id,
-      },
-    );
+    await project.save();
 
     return project;
   }

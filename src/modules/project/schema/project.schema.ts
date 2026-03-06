@@ -55,6 +55,13 @@ export class Project extends Document {
     default: null,
   })
   currentSprint: Types.ObjectId | null;
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Workspace',
+    default: null,
+  })
+  workspaceId: Types.ObjectId | null;
 }
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);

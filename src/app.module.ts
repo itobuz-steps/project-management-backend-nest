@@ -16,6 +16,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { join } from 'path';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { StorageModule } from './storage/storage.module';
+import { WorkspaceModule } from './modules/workspace/workspace.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { StorageModule } from './storage/storage.module';
     ActivityModule,
     ScheduleModule.forRoot(),
     StorageModule,
+    WorkspaceModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailSender],

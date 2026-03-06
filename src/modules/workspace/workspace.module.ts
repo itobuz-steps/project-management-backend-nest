@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ProjectService } from '../project/services/project.service';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { NotificationModule } from '../notification/notification.module';
+import { TasksModule } from '../tasks/tasks.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationModule } from '../notification/notification.module';
     JwtModule.register({}),
     AuthModule,
     NotificationModule,
+    TasksModule,
   ],
   controllers: [WorkspaceController],
   providers: [WorkspaceService, ProjectService],

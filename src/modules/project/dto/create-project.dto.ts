@@ -1,5 +1,13 @@
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 import { ProjectType } from '../type/project.types';
+import { Type } from 'class-transformer';
+import { ProjectMemberDto } from './project-member-dto';
 
 export class CreateProjectDto {
   @IsString()
@@ -15,4 +23,22 @@ export class CreateProjectDto {
   @IsOptional()
   @IsArray()
   columns?: string[];
+
+  @IsOptional()
+  @IsString()
+  defaultAssignee?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
+  iconKey?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProjectMemberDto)
+  members?: ProjectMemberDto[];
 }

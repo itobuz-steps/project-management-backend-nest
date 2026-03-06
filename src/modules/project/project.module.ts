@@ -11,6 +11,7 @@ import { InviteUserService } from './services/invite-user.service';
 import { NotificationModule } from '../notification/notification.module';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { TasksModule } from '../tasks/tasks.module';
+import { StorageModule } from 'src/storage/storage.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { TasksModule } from '../tasks/tasks.module';
     JwtModule.register({}),
     AuthModule,
     TasksModule,
+    StorageModule,
   ],
   controllers: [ProjectController, InviteUserController],
   providers: [

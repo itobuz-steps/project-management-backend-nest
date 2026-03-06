@@ -16,6 +16,7 @@ import { Role } from '../../auth/types/auth.types';
 import { Task } from '../../tasks/entities/task.entity';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class ProjectService {
@@ -30,6 +31,7 @@ export class ProjectService {
     private readonly connection: Connection,
 
     private readonly notificationPushService: NotificationPushService,
+    private readonly storageService: StorageService,
   ) {}
 
   async getAllProjects(userId: ObjectIdLike, role: Role): Promise<Project[]> {
@@ -87,6 +89,7 @@ export class ProjectService {
     userId: ObjectIdLike,
     role: Role,
     dto: CreateProjectDto,
+    file?: Express.Multer.File,
   ): Promise<Project> {
     if (role !== Role.SUPERADMIN) {
       throw new ForbiddenException('Only superadmin can create projects');
@@ -94,11 +97,23 @@ export class ProjectService {
 
     const prefix = dto.prefix ?? generateProjectPrefix(dto.name);
 
+    let iconUrl: string | undefined;
+    let iconKey: string | undefined;
+
+    if (file) {
+      const uploadRes = await this.storageService.uploadSingleFile(file);
+
+      iconUrl = uploadRes.url;
+      iconKey = uploadRes.key;
+    }
+
     const project = new this.projectModel({
       ...dto,
+      prefix,
+      icon: iconUrl,
+      iconKey,
       memberLead: userId,
       members: [{ user: userId, role: 'admin' }],
-      prefix,
     });
 
     const savedProject = await project.save();
@@ -117,45 +132,55 @@ export class ProjectService {
     role: Role,
     projectId: ObjectIdLike,
     update: UpdateProjectDto,
+    file?: Express.Multer.File,
   ): Promise<Project> {
-    if (role !== Role.SUPERADMIN) {
-      throw new ForbiddenException('Only superadmin can update projects');
-    }
-
-    const updatePayload = { ...update };
-
-    if (update.name) {
-      updatePayload.prefix = generateProjectPrefix(update.name);
-    }
-
-    const project = await this.projectModel.findOneAndUpdate(
-      {
-        _id: projectId,
-        members: {
-          $elemMatch: {
-            user: userId,
-            role: 'admin',
-          },
+    const project = await this.projectModel.findOne({
+      _id: projectId,
+      members: {
+        $elemMatch: {
+          user: userId,
+          role: 'admin',
         },
       },
-      updatePayload,
-      { new: true },
-    );
+    });
 
     if (!project) {
       throw new ForbiddenException('Not allowed to update this project');
     }
 
+    const updatePayload = { ...update };
+
+    if (file) {
+      const uploadRes = await this.storageService.uploadSingleFile(file);
+
+      if (project.iconKey) {
+        try {
+          await this.storageService.deleteFile(project.iconKey);
+        } catch (err) {
+          console.warn('Failed to delete old project icon', err);
+        }
+      }
+
+      updatePayload.icon = uploadRes.url;
+      updatePayload.iconKey = uploadRes.key;
+    }
+
+    const updatedProject = await this.projectModel.findByIdAndUpdate(
+      projectId,
+      { $set: updatePayload },
+      { new: true },
+    );
+
     await this.notificationPushService.pushNotificationToProjectMembers(
-      project._id,
+      projectId,
       {
-        title: `Project "${project.name}" Updated`,
-        message: `Project "${project.name}" was updated`,
-        projectId: project._id,
+        title: `Project "${updatedProject!.name}" Updated`,
+        message: `Project "${updatedProject!.name}" was updated`,
+        projectId: updatedProject!._id,
       },
     );
 
-    return project;
+    return updatedProject!;
   }
 
   async deleteProject(
@@ -169,12 +194,6 @@ export class ProjectService {
 
     const project = await this.projectModel.findOne({
       _id: projectId,
-      members: {
-        $elemMatch: {
-          user: userId,
-          role: 'admin',
-        },
-      },
     });
 
     if (!project) {

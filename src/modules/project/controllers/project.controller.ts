@@ -16,6 +16,9 @@ import { UpdateProjectDto } from '../dto/update-project.dto';
 import type { AuthenticatedRequest } from 'src/type/common.type';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import { ApiBearerAuth } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { UploadedFile, UseInterceptors } from '@nestjs/common';
+import { multerOptionsForSingleFile } from 'src/config/multer.config';
 
 @Controller('project')
 @ApiBearerAuth()
@@ -64,9 +67,11 @@ export class ProjectController {
   }
 
   @Post()
+  @UseInterceptors(FileInterceptor('icon', multerOptionsForSingleFile))
   async createProject(
     @Req() req: AuthenticatedRequest,
     @Body() dto: CreateProjectDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
     return {
       success: true,
@@ -74,16 +79,19 @@ export class ProjectController {
         req.user._id,
         req.user.role,
         dto,
+        file,
       ),
       message: 'Project created successfully',
     };
   }
 
   @Put(':projectId')
+  @UseInterceptors(FileInterceptor('icon', multerOptionsForSingleFile))
   async updateProject(
     @Param('projectId') projectId: string,
     @Req() req: AuthenticatedRequest,
     @Body() dto: UpdateProjectDto,
+    @UploadedFile() file?: Express.Multer.File,
   ) {
     return {
       success: true,
@@ -92,6 +100,7 @@ export class ProjectController {
         req.user.role,
         projectId,
         dto,
+        file,
       ),
       message: 'Project updated successfully',
     };

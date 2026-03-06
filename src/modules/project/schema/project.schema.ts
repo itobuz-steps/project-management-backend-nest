@@ -10,6 +10,12 @@ export class Project extends Document {
   @Prop({ required: true })
   name: string;
 
+  @Prop({ type: String, default: null })
+  icon?: string;
+
+  @Prop()
+  iconKey?: string;
+
   @Prop({ required: true, enum: ProjectType })
   projectType: ProjectType;
 
@@ -55,6 +61,9 @@ export class Project extends Document {
     default: null,
   })
   currentSprint: Types.ObjectId | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  defaultAssignee?: Types.ObjectId;
 }
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);

@@ -11,6 +11,7 @@ import { ProjectService } from '../project/services/project.service';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { ActivityModule } from '../activity/activity.module';
 import { TasksModule } from '../tasks/tasks.module';
+import { StorageModule } from 'src/storage/storage.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { TasksModule } from '../tasks/tasks.module';
     AuthModule,
     ActivityModule,
     TasksModule,
+    StorageModule,
   ],
   controllers: [SprintController],
   providers: [

@@ -29,10 +29,16 @@ import { CommentService } from '../modules/comment/comment.service';
 import { CreateCommentDto } from '../modules/comment/dto/create-comment.dto';
 
 import { Activity } from '../modules/activity/schemas/activity.schemas';
+import { ActivityAction } from '../modules/activity/type/activity.types';
 import { Notification } from '../modules/notification/schemas/notification.schema';
 import { Subscription } from '../modules/notification/schemas/subscription.schema';
+import { Workspace } from '../modules/workspace/entities/workspace.entity';
 
 const PASSWORD = 'Password@123';
+const LAST_7_DAYS = 7;
+const MINUTE_IN_MS = 60 * 1000;
+const HOUR_IN_MS = 60 * MINUTE_IN_MS;
+const DAY_IN_MS = 24 * HOUR_IN_MS;
 
 const UNSPLASH_LINKS = [
   'https://images.unsplash.com/photo-1518773553398-650c184e0bb3',
@@ -46,12 +52,12 @@ const UNSPLASH_LINKS = [
 
 const seedUsers = [
   {
-    name: 'Ava Thompson',
-    email: 'ava.superadmin@pm.local',
+    name: 'Devjyoti Banerjee',
+    email: 'devjyoti.banerjee@itobuz.com',
     role: Role.SUPERADMIN,
   },
-  { name: 'Liam Carter', email: 'liam@pm.local', role: Role.USER },
-  { name: 'Noah Patel', email: 'noah@pm.local', role: Role.USER },
+  { name: 'Sujal Gupta', email: 'sujal.gupta@itobuz.com', role: Role.USER },
+  { name: 'Esha Tokedar', email: 'esha.tokedar@itobuz.com', role: Role.USER },
   { name: 'Emma Walker', email: 'emma@pm.local', role: Role.USER },
   { name: 'Olivia Kim', email: 'olivia@pm.local', role: Role.USER },
   { name: 'Ethan Rossi', email: 'ethan@pm.local', role: Role.USER },
@@ -125,6 +131,11 @@ const seedProjects = [
   },
 ];
 
+const seedWorkspaces = [
+  { name: 'Client Delivery Workspace' },
+  { name: 'Internal Product Workspace' },
+];
+
 function rand(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -145,9 +156,190 @@ function dueDate(daysFromNow: number): Date {
   return d;
 }
 
+function daysAgo(days: number): Date {
+  return new Date(Date.now() - days * DAY_IN_MS);
+}
+
+function buildMarkdownDescription(projectName: string, theme: string): string {
+  return [
+    `## ${theme} rollout`,
+    '',
+    `Improve **${theme}** for \`${projectName}\` with production-ready acceptance criteria.`,
+    '',
+    '### Acceptance Criteria',
+    `- Support the primary ${theme} workflow end-to-end`,
+    '- Handle validation and failure states gracefully',
+    '- Add regression coverage for the most likely edge cases',
+    '',
+    '### QA Checklist',
+    '- [ ] Verify happy path in staging',
+    '- [ ] Confirm API responses match the contract',
+    '- [ ] Capture screenshots or logs for review',
+    '',
+    '### Notes',
+    '```ts',
+    `// Follow project conventions when touching ${theme}`,
+    "const featureFlag = 'seed-demo';",
+    '```',
+  ].join('\n');
+}
+
+function buildMarkdownComment(theme: string): string {
+  return pick([
+    [
+      `**QA update for ${theme}**`,
+      '',
+      '- Verified the main flow in staging',
+      '- Reproduced the previous edge case once',
+      '- Added follow-up notes for the next pass',
+    ].join('\n'),
+    [
+      `Blocked on \`${theme}\` contract clarification.`,
+      '',
+      '> Waiting on backend confirmation for one response shape before sign-off.',
+    ].join('\n'),
+    [
+      'Pushed a follow-up fix for reviewer notes.',
+      '',
+      '```md',
+      '- tighten validation',
+      '- improve empty state copy',
+      '- re-test assignment flow',
+      '```',
+    ].join('\n'),
+    [
+      'Looks good overall.',
+      '',
+      '- [x] QA verified in staging',
+      '- [ ] Need product sign-off',
+    ].join('\n'),
+    [
+      'Added regression coverage for the issue path.',
+      '',
+      `Reference: [${theme} checklist](#${theme.toLowerCase().replace(/\s+/g, '-')})`,
+    ].join('\n'),
+  ]);
+}
+
+function randomDateBetween(startDate: Date, endDate: Date): Date {
+  const start = startDate.getTime();
+  const end = endDate.getTime();
+
+  if (end <= start) {
+    return new Date(start);
+  }
+
+  return new Date(rand(start, end));
+}
+
+function randomDateInLastDays(days: number): Date {
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - days * DAY_IN_MS);
+
+  return randomDateBetween(windowStart, now);
+}
+
+function nextTimelineDate(previousDate: Date, maxAdvanceMs = 36 * HOUR_IN_MS) {
+  const now = new Date();
+  const earliest = Math.min(
+    previousDate.getTime() + MINUTE_IN_MS,
+    now.getTime(),
+  );
+  const latest = Math.min(previousDate.getTime() + maxAdvanceMs, now.getTime());
+
+  if (latest <= earliest) {
+    return new Date(now);
+  }
+
+  return new Date(rand(earliest, latest));
+}
+
+async function setDocumentTimestamps<T>(
+  model: Model<T>,
+  id: unknown,
+  createdAt: Date,
+  updatedAt = createdAt,
+) {
+  await model.collection.updateOne(
+    { _id: id } as Record<string, unknown>,
+    {
+      $set: {
+        createdAt,
+        updatedAt,
+      },
+    } as Record<string, unknown>,
+  );
+}
+
+async function setLatestActivityTimestamp(
+  activityModel: Model<Activity>,
+  params: {
+    taskId: unknown;
+    action: ActivityAction;
+    byUserId?: unknown;
+    targetUserId?: unknown;
+    createdAt: Date;
+  },
+) {
+  const { taskId, action, byUserId, targetUserId, createdAt } = params;
+  const filter: Record<string, unknown> = {
+    task: taskId,
+    action,
+  };
+
+  if (byUserId) {
+    filter.byUser = byUserId;
+  }
+
+  if (targetUserId) {
+    filter.targetUser = targetUserId;
+  }
+
+  const activity = await activityModel.findOne(filter).sort({ createdAt: -1 });
+
+  if (!activity) {
+    return;
+  }
+
+  await setDocumentTimestamps(activityModel, activity._id, createdAt);
+}
+
+async function createSeedActivity(
+  activityModel: Model<Activity>,
+  params: {
+    taskId: unknown;
+    action: ActivityAction;
+    byUserId: unknown;
+    targetUserId?: unknown;
+    updatedFields?: Record<string, { from: string; to: string }>;
+    createdAt: Date;
+  },
+) {
+  const activity = new activityModel({
+    task: params.taskId,
+    action: params.action,
+    byUser: params.byUserId,
+    targetUser: params.targetUserId,
+    updatedFields: params.updatedFields,
+  } as Partial<Activity>);
+
+  await activity.save();
+
+  await setDocumentTimestamps(activityModel, activity._id, params.createdAt);
+  return activity;
+}
+
+interface SeededTaskTimeline {
+  task: Task;
+  projectUsers: UserDocument[];
+  taskCreatedAt: Date;
+  latestTimelineAt: Date;
+}
+
 interface ProjectSeedSummary {
   name: string;
   type: ProjectType;
+  workspace: string;
   memberCount: number;
   taskCount: number;
   commentCount: number;
@@ -176,6 +368,9 @@ async function bootstrap() {
   const subscriptionModel = app.get<Model<Subscription>>(
     getModelToken(Subscription.name),
   );
+  const workspaceModel = app.get<Model<Workspace>>(
+    getModelToken(Workspace.name),
+  );
 
   try {
     console.log('Seed started');
@@ -196,6 +391,7 @@ async function bootstrap() {
       subscriptionModel.deleteMany({}),
       otpModel.deleteMany({}),
       projectModel.deleteMany({}),
+      workspaceModel.deleteMany({}),
       userModel.deleteMany({}),
     ]);
 
@@ -210,7 +406,8 @@ async function bootstrap() {
         `  subscriptions: ${cleanupResults[5].deletedCount ?? 0}`,
         `  otps: ${cleanupResults[6].deletedCount ?? 0}`,
         `  projects: ${cleanupResults[7].deletedCount ?? 0}`,
-        `  users: ${cleanupResults[8].deletedCount ?? 0}`,
+        `  workspaces: ${cleanupResults[8].deletedCount ?? 0}`,
+        `  users: ${cleanupResults[9].deletedCount ?? 0}`,
       ].join('\n'),
     );
 
@@ -235,6 +432,9 @@ async function bootstrap() {
 
     if (!superadmin) throw new Error('Superadmin not created');
 
+    const createdWorkspaces = await workspaceModel.create(seedWorkspaces);
+    console.log(`Workspaces seeded: ${createdWorkspaces.length}`);
+
     // projects + tasks + comments + sprints
     for (const p of seedProjects) {
       let projectCommentCount = 0;
@@ -247,6 +447,10 @@ async function bootstrap() {
           name: p.name,
           projectType: p.projectType,
           columns: p.columns,
+          workspaceId:
+            createdWorkspaces[
+              projectSummaries.length % createdWorkspaces.length
+            ]._id.toString(),
         },
       );
 
@@ -267,6 +471,7 @@ async function bootstrap() {
       const projectUsers = [superadmin, ...selectedMembers];
       const taskCount = rand(10, 15);
       const createdTaskIds: string[] = [];
+      const seededTasks: SeededTaskTimeline[] = [];
 
       for (let i = 0; i < taskCount; i++) {
         const theme = pick(p.themes);
@@ -283,7 +488,7 @@ async function bootstrap() {
             'UI polish',
             'validation',
           ])}`,
-          description: `Work item for ${p.name}: improve ${theme} with production-ready acceptance criteria and tests.`,
+          description: buildMarkdownDescription(p.name, theme),
           type: pick(TASK_TYPES),
           status: pick(p.columns),
           priority: pick(TASK_PRIORITIES),
@@ -309,12 +514,32 @@ async function bootstrap() {
           reporter.role,
           createTaskDto,
         );
+        const taskCreatedAt = randomDateInLastDays(LAST_7_DAYS);
+        let latestTimelineAt = taskCreatedAt;
 
         if (Math.random() < 0.3) {
           task.attachments.push(pick(UNSPLASH_LINKS));
         }
 
         await task.save();
+        await setDocumentTimestamps(taskModel, task._id, taskCreatedAt);
+        await setLatestActivityTimestamp(activityModel, {
+          taskId: task._id,
+          action: ActivityAction.TASK_CREATED,
+          byUserId: reporter._id,
+          createdAt: taskCreatedAt,
+        });
+
+        if (assignee) {
+          latestTimelineAt = nextTimelineDate(taskCreatedAt, 6 * HOUR_IN_MS);
+          await setLatestActivityTimestamp(activityModel, {
+            taskId: task._id,
+            action: ActivityAction.ASSIGNEE_CHANGED,
+            byUserId: reporter._id,
+            targetUserId: assignee._id,
+            createdAt: latestTimelineAt,
+          });
+        }
 
         createdTaskIds.push(task._id.toString());
 
@@ -322,13 +547,7 @@ async function bootstrap() {
         for (let c = 0; c < commentCount; c++) {
           const author = pick(projectUsers);
           const createCommentDto: CreateCommentDto = {
-            message: pick([
-              'I validated the acceptance criteria and updated edge cases.',
-              'Blocked on API contract clarification. Syncing with backend.',
-              'Pushed a follow-up fix for reviewer notes.',
-              'Looks good; pending QA verification in staging.',
-              'Added test coverage for the regression path.',
-            ]),
+            message: buildMarkdownComment(theme),
           };
 
           const comment = await commentService.create(
@@ -343,9 +562,346 @@ async function bootstrap() {
 
           await comment.save();
 
+          const commentCreatedAt = nextTimelineDate(latestTimelineAt);
+          latestTimelineAt = commentCreatedAt;
+
+          await setDocumentTimestamps(
+            commentModel,
+            comment._id,
+            commentCreatedAt,
+          );
+          await setLatestActivityTimestamp(activityModel, {
+            taskId: task._id,
+            action: ActivityAction.COMMENT_ADDED,
+            byUserId: author._id,
+            createdAt: commentCreatedAt,
+          });
+
           projectCommentCount += 1;
           totalComments += 1;
         }
+
+        seededTasks.push({
+          task,
+          projectUsers,
+          taskCreatedAt,
+          latestTimelineAt,
+        });
+      }
+
+      const extraActivityTargets = sample(
+        seededTasks,
+        Math.min(rand(5, 6), seededTasks.length),
+      );
+
+      for (const seededTask of extraActivityTargets) {
+        const availableActions = ['description', 'priority', 'title'];
+        const finalColumn = p.columns[p.columns.length - 1];
+
+        if (seededTask.task.status !== finalColumn) {
+          availableActions.push('status');
+        }
+
+        const actionSequence = sample(
+          availableActions,
+          rand(2, Math.min(3, availableActions.length)),
+        );
+
+        for (const extraAction of actionSequence) {
+          const actor = pick(seededTask.projectUsers);
+
+          if (extraAction === 'status') {
+            const previousStatus = seededTask.task.status;
+
+            seededTask.latestTimelineAt = nextTimelineDate(
+              seededTask.latestTimelineAt,
+            );
+
+            seededTask.task.status = finalColumn;
+            await seededTask.task.save();
+            await setDocumentTimestamps(
+              taskModel,
+              seededTask.task._id,
+              seededTask.taskCreatedAt,
+              seededTask.latestTimelineAt,
+            );
+
+            await createSeedActivity(activityModel, {
+              taskId: seededTask.task._id,
+              action: ActivityAction.STATUS_CHANGED,
+              byUserId: actor._id,
+              updatedFields: {
+                status: { from: previousStatus, to: finalColumn },
+              },
+              createdAt: seededTask.latestTimelineAt,
+            });
+
+            continue;
+          }
+
+          if (extraAction === 'description') {
+            const previousDescription = seededTask.task.description ?? '';
+            const nextDescription = [
+              previousDescription,
+              '',
+              '### Update',
+              pick([
+                '- Clarified rollout notes for QA handoff.',
+                '- Added edge-case handling for the release candidate.',
+                '- Updated implementation notes after stakeholder review.',
+              ]),
+              pick([
+                '> Reviewer note: double-check markdown rendering in the task drawer.',
+                '> Keep the final copy concise for stakeholder demos.',
+                '> Add one more verification pass before release.',
+              ]),
+            ]
+              .join('\n')
+              .trim();
+
+            seededTask.latestTimelineAt = nextTimelineDate(
+              seededTask.latestTimelineAt,
+            );
+            seededTask.task.description = nextDescription;
+            await seededTask.task.save();
+            await setDocumentTimestamps(
+              taskModel,
+              seededTask.task._id,
+              seededTask.taskCreatedAt,
+              seededTask.latestTimelineAt,
+            );
+
+            await createSeedActivity(activityModel, {
+              taskId: seededTask.task._id,
+              action: ActivityAction.TASK_UPDATED,
+              byUserId: actor._id,
+              updatedFields: {
+                description: {
+                  from: previousDescription,
+                  to: nextDescription,
+                },
+              },
+              createdAt: seededTask.latestTimelineAt,
+            });
+
+            continue;
+          }
+
+          if (extraAction === 'priority') {
+            const priorityOptions = TASK_PRIORITIES.filter(
+              (priority) => priority !== seededTask.task.priority,
+            );
+            const nextPriority = pick(priorityOptions);
+            const previousPriority = seededTask.task.priority;
+
+            seededTask.latestTimelineAt = nextTimelineDate(
+              seededTask.latestTimelineAt,
+            );
+            seededTask.task.priority = nextPriority;
+            await seededTask.task.save();
+            await setDocumentTimestamps(
+              taskModel,
+              seededTask.task._id,
+              seededTask.taskCreatedAt,
+              seededTask.latestTimelineAt,
+            );
+
+            await createSeedActivity(activityModel, {
+              taskId: seededTask.task._id,
+              action: ActivityAction.TASK_UPDATED,
+              byUserId: actor._id,
+              updatedFields: {
+                priority: {
+                  from: previousPriority,
+                  to: nextPriority,
+                },
+              },
+              createdAt: seededTask.latestTimelineAt,
+            });
+
+            continue;
+          }
+
+          const previousTitle = seededTask.task.title;
+          const nextTitle = `${previousTitle} (${pick([
+            'handoff',
+            'release-ready',
+            'final pass',
+          ])})`;
+
+          seededTask.latestTimelineAt = nextTimelineDate(
+            seededTask.latestTimelineAt,
+          );
+          seededTask.task.title = nextTitle;
+          await seededTask.task.save();
+          await setDocumentTimestamps(
+            taskModel,
+            seededTask.task._id,
+            seededTask.taskCreatedAt,
+            seededTask.latestTimelineAt,
+          );
+
+          await createSeedActivity(activityModel, {
+            taskId: seededTask.task._id,
+            action: ActivityAction.TASK_UPDATED,
+            byUserId: actor._id,
+            updatedFields: {
+              title: {
+                from: previousTitle,
+                to: nextTitle,
+              },
+            },
+            createdAt: seededTask.latestTimelineAt,
+          });
+        }
+      }
+
+      const subtaskParents = sample(
+        seededTasks,
+        Math.min(rand(2, 3), Math.max(seededTasks.length - 1, 0)),
+      );
+      const reservedSubtaskIds = new Set<string>();
+
+      for (const parentSeed of subtaskParents) {
+        const parentId = parentSeed.task._id.toString();
+
+        if (reservedSubtaskIds.has(parentId)) {
+          continue;
+        }
+
+        const childCandidates = seededTasks.filter((candidate) => {
+          const candidateId = candidate.task._id.toString();
+
+          return (
+            candidateId !== parentId &&
+            !reservedSubtaskIds.has(candidateId) &&
+            !candidate.task.parentTask
+          );
+        });
+
+        const selectedChildren = sample(
+          childCandidates,
+          Math.min(rand(1, 2), childCandidates.length),
+        );
+
+        if (!selectedChildren.length) {
+          continue;
+        }
+
+        parentSeed.task.subTasks = selectedChildren.map(
+          (child) => child.task._id,
+        );
+        parentSeed.latestTimelineAt = nextTimelineDate(
+          parentSeed.latestTimelineAt,
+          12 * HOUR_IN_MS,
+        );
+        await parentSeed.task.save();
+        await setDocumentTimestamps(
+          taskModel,
+          parentSeed.task._id,
+          parentSeed.taskCreatedAt,
+          parentSeed.latestTimelineAt,
+        );
+
+        for (const childSeed of selectedChildren) {
+          reservedSubtaskIds.add(childSeed.task._id.toString());
+          childSeed.task.parentTask = parentSeed.task._id;
+          childSeed.latestTimelineAt = nextTimelineDate(
+            childSeed.latestTimelineAt,
+            12 * HOUR_IN_MS,
+          );
+          await childSeed.task.save();
+          await setDocumentTimestamps(
+            taskModel,
+            childSeed.task._id,
+            childSeed.taskCreatedAt,
+            childSeed.latestTimelineAt,
+          );
+        }
+      }
+
+      const linkedTaskPairCount = Math.min(rand(3, 4), seededTasks.length - 1);
+      const linkedPairKeys = new Set<string>();
+      let linkedPairsCreated = 0;
+      let linkAttempts = 0;
+
+      while (linkedPairsCreated < linkedTaskPairCount && linkAttempts < 25) {
+        linkAttempts += 1;
+
+        const leftSeed = pick(seededTasks);
+        const rightCandidates = seededTasks.filter(
+          (candidate) =>
+            candidate.task._id.toString() !== leftSeed.task._id.toString() &&
+            candidate.task.parentTask?.toString() !==
+              leftSeed.task._id.toString() &&
+            leftSeed.task.parentTask?.toString() !==
+              candidate.task._id.toString(),
+        );
+
+        if (!rightCandidates.length) {
+          continue;
+        }
+
+        const rightSeed = pick(rightCandidates);
+        const pairKey = [
+          leftSeed.task._id.toString(),
+          rightSeed.task._id.toString(),
+        ]
+          .sort()
+          .join(':');
+
+        if (linkedPairKeys.has(pairKey)) {
+          continue;
+        }
+
+        linkedPairKeys.add(pairKey);
+        linkedPairsCreated += 1;
+
+        leftSeed.task.relatesTo = [...(leftSeed.task.relatesTo ?? [])];
+        rightSeed.task.relatesTo = [...(rightSeed.task.relatesTo ?? [])];
+
+        if (
+          !leftSeed.task.relatesTo.some(
+            (relatedTaskId) =>
+              relatedTaskId.toString() === rightSeed.task._id.toString(),
+          )
+        ) {
+          leftSeed.task.relatesTo.push(rightSeed.task._id);
+        }
+
+        if (
+          !rightSeed.task.relatesTo.some(
+            (relatedTaskId) =>
+              relatedTaskId.toString() === leftSeed.task._id.toString(),
+          )
+        ) {
+          rightSeed.task.relatesTo.push(leftSeed.task._id);
+        }
+
+        leftSeed.latestTimelineAt = nextTimelineDate(
+          leftSeed.latestTimelineAt,
+          12 * HOUR_IN_MS,
+        );
+        rightSeed.latestTimelineAt = nextTimelineDate(
+          rightSeed.latestTimelineAt,
+          12 * HOUR_IN_MS,
+        );
+
+        await leftSeed.task.save();
+        await rightSeed.task.save();
+
+        await setDocumentTimestamps(
+          taskModel,
+          leftSeed.task._id,
+          leftSeed.taskCreatedAt,
+          leftSeed.latestTimelineAt,
+        );
+        await setDocumentTimestamps(
+          taskModel,
+          rightSeed.task._id,
+          rightSeed.taskCreatedAt,
+          rightSeed.latestTimelineAt,
+        );
       }
 
       totalTasks += taskCount;
@@ -414,6 +970,74 @@ async function bootstrap() {
           });
         }
 
+        const completedSprintCount = rand(1, 2);
+
+        for (
+          let completedSprintIndex = 0;
+          completedSprintIndex < completedSprintCount;
+          completedSprintIndex++
+        ) {
+          const completedSprintTasks = sample(
+            seededTasks,
+            Math.min(rand(3, 5), seededTasks.length),
+          );
+
+          if (!completedSprintTasks.length) {
+            continue;
+          }
+
+          const completionAnchor = completedSprintTasks.reduce(
+            (latest, seededTask) =>
+              seededTask.latestTimelineAt > latest
+                ? seededTask.latestTimelineAt
+                : latest,
+            daysAgo(LAST_7_DAYS),
+          );
+          const sprintEndDate = randomDateBetween(completionAnchor, new Date());
+          const sprintDueDate = new Date(
+            sprintEndDate.getTime() - rand(2, 5) * DAY_IN_MS,
+          );
+          const sprintCreatedAt = new Date(
+            sprintDueDate.getTime() - rand(4, 8) * DAY_IN_MS,
+          );
+          const sprintNumber = project.sprintCount + 1;
+          const sprintTasks = completedSprintTasks.map(
+            (seededTask) => seededTask.task._id,
+          );
+          const sprintStoryPoint = completedSprintTasks.reduce(
+            (sum, seededTask) => sum + seededTask.task.storyPoint,
+            0,
+          );
+
+          const completedSprint = await sprintModel.create({
+            key: `${project.prefix}-sprint-${sprintNumber}`,
+            projectId: project._id,
+            tasks: sprintTasks,
+            dueDate: sprintDueDate,
+            isCompleted: true,
+            storyPoint: sprintStoryPoint,
+            endDate: sprintEndDate,
+            taskStatusesAtCompletion: new Map(
+              completedSprintTasks.map((seededTask) => [
+                seededTask.task._id.toString(),
+                seededTask.task.status,
+              ]),
+            ),
+          });
+
+          await sprintModel.collection.updateOne({ _id: completedSprint._id }, {
+            $set: {
+              name: `${project.name} Completed Sprint ${completedSprintIndex + 1}`,
+              createdAt: sprintCreatedAt,
+              updatedAt: sprintEndDate,
+            },
+          } as Record<string, unknown>);
+
+          project.sprintCount += 1;
+          projectSprintCount += 1;
+          totalSprints += 1;
+        }
+
         project.currentSprint = sprint2._id;
         await project.save();
       }
@@ -421,6 +1045,9 @@ async function bootstrap() {
       projectSummaries.push({
         name: p.name,
         type: p.projectType,
+        workspace:
+          createdWorkspaces[projectSummaries.length % createdWorkspaces.length]
+            .name,
         memberCount: project.members.length,
         taskCount,
         commentCount: projectCommentCount,
@@ -437,6 +1064,7 @@ async function bootstrap() {
     console.log(
       [
         `  users: ${createdUsers.length}`,
+        `  workspaces: ${createdWorkspaces.length}`,
         `  projects: ${projectSummaries.length}`,
         `  tasks: ${totalTasks}`,
         `  comments: ${totalComments}`,
@@ -446,7 +1074,7 @@ async function bootstrap() {
     console.log('Project breakdown');
     for (const summary of projectSummaries) {
       console.log(
-        `  ${summary.name} | type=${summary.type} | members=${summary.memberCount} | tasks=${summary.taskCount} | comments=${summary.commentCount} | sprints=${summary.sprintCount}`,
+        `  ${summary.name} | workspace=${summary.workspace} | type=${summary.type} | members=${summary.memberCount} | tasks=${summary.taskCount} | comments=${summary.commentCount} | sprints=${summary.sprintCount}`,
       );
     }
     console.log(`Users password for all seeded accounts: ${PASSWORD}`);

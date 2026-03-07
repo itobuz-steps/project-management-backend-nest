@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsEnum,
+  IsMongoId,
   IsOptional,
   IsString,
   ValidateNested,
@@ -41,4 +42,10 @@ export class CreateProjectDto {
   @ValidateNested({ each: true })
   @Type(() => ProjectMemberDto)
   members?: ProjectMemberDto[];
+
+  @IsMongoId()
+  memberLead?: string;
+
+  @IsString()
+  theme?: string;
 }

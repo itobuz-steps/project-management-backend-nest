@@ -64,6 +64,9 @@ export class Project extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'User', default: null })
   defaultAssignee?: Types.ObjectId;
+
+  @Prop({ type: String, default: 'indigo' })
+  theme: string;
 }
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);

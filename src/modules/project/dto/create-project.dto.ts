@@ -48,4 +48,6 @@ export class CreateProjectDto {
 
   @IsString()
   theme?: string;
+  @IsMongoId()
+  workspaceId?: string;
 }

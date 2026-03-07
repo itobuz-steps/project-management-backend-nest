@@ -67,6 +67,13 @@ export class Project extends Document {
 
   @Prop({ type: String, default: 'indigo' })
   theme: string;
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Workspace',
+    default: null,
+  })
+  workspaceId: Types.ObjectId | null;
 }
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);

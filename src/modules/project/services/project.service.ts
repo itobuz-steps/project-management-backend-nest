@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Project } from '../schema/project.schema';
 import { CreateProjectDto } from '../dto/create-project.dto';
 import { UpdateProjectDto } from '../dto/update-project.dto';
@@ -112,6 +112,7 @@ export class ProjectService {
       prefix,
       icon: iconUrl,
       iconKey,
+      workspaceId: dto.workspaceId ? new Types.ObjectId(dto.workspaceId) : null,
       memberLead: userId,
       members: [{ user: userId, role: 'admin' }],
     });

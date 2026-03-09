@@ -2,7 +2,7 @@ import { PartialType, ApiProperty } from '@nestjs/swagger';
 import { IsArray, IsOptional, IsString } from 'class-validator';
 import { CreateTaskDto } from './create-task.dto';
 import { Transform } from 'class-transformer';
-import { transformToMongoIdArray } from 'src/utils/transform.utils';
+import { transformToArray } from 'src/utils/transform.utils';
 
 export class UpdateTaskDto extends PartialType(CreateTaskDto) {
   @ApiProperty({
@@ -20,7 +20,7 @@ export class UpdateTaskDto extends PartialType(CreateTaskDto) {
     example: ['attachments-123456-report.pdf'],
   })
   @IsOptional()
-  @Transform(transformToMongoIdArray)
+  @Transform(transformToArray)
   @IsArray()
   @IsString({ each: true })
   existingAttachments?: string[];

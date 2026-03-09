@@ -8,7 +8,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { TASK_PRIORITIES } from 'src/constants/task.constants';
+import { TASK_PRIORITIES, TASK_TYPES } from 'src/constants/task.constants';
 
 // Common error response schema
 const ErrorResponse = {
@@ -141,6 +141,7 @@ export function GetAllTasksDocs() {
         'status',
         'priority',
         'dueDate',
+        'key',
         'createdAt',
         'updatedAt',
       ],
@@ -168,6 +169,13 @@ export function GetAllTasksDocs() {
       type: String,
     }),
     ApiQuery({
+      name: 'type',
+      required: false,
+      description: 'Filter tasks by type',
+      enum: TASK_TYPES,
+      example: 'task',
+    }),
+    ApiQuery({
       name: 'tags',
       required: false,
       description: 'Filter tasks by tags (comma-separated)',
@@ -181,17 +189,47 @@ export function GetAllTasksDocs() {
       example: '507f1f77bcf86cd799439011',
       type: String,
     }),
+    ApiQuery({
+      name: 'page',
+      required: false,
+      description: 'Page number (1-indexed)',
+      example: 1,
+      type: Number,
+    }),
+    ApiQuery({
+      name: 'limit',
+      required: false,
+      description: 'Number of tasks per page',
+      example: 10,
+      type: Number,
+    }),
     ApiResponse({
       status: 200,
-      description: 'Successfully retrieved list of tasks',
+      description: 'Successfully retrieved paginated list of tasks',
       schema: {
         type: 'object',
         properties: {
           success: { type: 'boolean', example: true },
           result: {
-            type: 'array',
-            items: {
-              type: 'object',
+            type: 'object',
+            properties: {
+              data: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                },
+              },
+              pagination: {
+                type: 'object',
+                properties: {
+                  page: { type: 'number', example: 1 },
+                  limit: { type: 'number', example: 10 },
+                  total: { type: 'number', example: 42 },
+                  totalPages: { type: 'number', example: 5 },
+                  hasNextPage: { type: 'boolean', example: true },
+                  hasPrevPage: { type: 'boolean', example: false },
+                },
+              },
             },
           },
         },

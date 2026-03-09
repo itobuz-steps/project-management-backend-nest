@@ -149,6 +149,8 @@ export class ProjectService {
       throw new ForbiddenException('Not allowed to update this project');
     }
 
+    const previousDefaultAssignee = project.defaultAssignee?.toString() || null;
+
     const updatePayload = { ...update };
 
     if (file) {
@@ -171,6 +173,23 @@ export class ProjectService {
       { $set: updatePayload },
       { new: true },
     );
+
+    const newDefaultAssignee =
+      updatePayload.defaultAssignee?.toString() ||
+      updatedProject?.defaultAssignee?.toString() ||
+      null;
+
+    if (!previousDefaultAssignee && newDefaultAssignee) {
+      await this.taskModel.updateMany(
+        {
+          projectId: projectId,
+          assignee: null,
+        },
+        {
+          $set: { assignee: new Types.ObjectId(newDefaultAssignee) },
+        },
+      );
+    }
 
     await this.notificationPushService.pushNotificationToProjectMembers(
       projectId,

@@ -13,7 +13,7 @@ import { TASK_PRIORITIES, TASK_TYPES } from '../../../constants/task.constants';
 import type { TaskPriority, TaskType } from '../../../constants/task.constants';
 import {
   transformNullableMongoId,
-  transformToMongoIdArray,
+  transformToArray,
 } from 'src/utils/transform.utils';
 
 export class CreateTaskDto {
@@ -72,6 +72,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformToArray)
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
@@ -91,6 +92,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformNullableMongoId)
   @IsMongoId()
   assignee?: string;
 
@@ -110,7 +112,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
-  @Transform(transformToMongoIdArray)
+  @Transform(transformToArray)
   @IsArray()
   @IsMongoId({ each: true })
   subTasks?: string[];
@@ -132,7 +134,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
-  @Transform(transformToMongoIdArray)
+  @Transform(transformToArray)
   @IsArray()
   @IsMongoId({ each: true })
   blocks?: string[];
@@ -144,7 +146,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
-  @Transform(transformToMongoIdArray)
+  @Transform(transformToArray)
   @IsArray()
   @IsMongoId({ each: true })
   blockedBy?: string[];
@@ -156,7 +158,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
-  @Transform(transformToMongoIdArray)
+  @Transform(transformToArray)
   @IsArray()
   @IsMongoId({ each: true })
   relatesTo?: string[];
@@ -168,7 +170,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
-  @Transform(transformToMongoIdArray)
+  @Transform(transformToArray)
   @IsArray()
   @IsMongoId({ each: true })
   duplicates?: string[];

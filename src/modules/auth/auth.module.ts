@@ -8,6 +8,7 @@ import { Otp, OtpSchema } from './schemas/otp.schema';
 import { MailService } from '../../utils/sendVerificationMail';
 import { TokenGeneratorService } from '../../utils/tokenGenerator';
 import { IsAuthenticated } from '../../middlewares/isAuthenticated';
+import { StorageModule } from 'src/storage/storage.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { IsAuthenticated } from '../../middlewares/isAuthenticated';
       { name: Otp.name, schema: OtpSchema },
     ]),
     JwtModule.register({}),
+    StorageModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, MailService, TokenGeneratorService, IsAuthenticated],

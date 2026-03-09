@@ -7,8 +7,9 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ProjectType } from '../type/project.types';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ProjectMemberDto } from './project-member-dto';
+import { transformNullableMongoId } from 'src/utils/transform.utils';
 
 export class CreateProjectDto {
   @IsString()
@@ -26,7 +27,8 @@ export class CreateProjectDto {
   columns?: string[];
 
   @IsOptional()
-  @IsString()
+  @Transform(transformNullableMongoId)
+  @IsMongoId()
   defaultAssignee?: string;
 
   @IsOptional()
@@ -48,6 +50,7 @@ export class CreateProjectDto {
 
   @IsString()
   theme?: string;
+
   @IsMongoId()
   workspaceId?: string;
 }

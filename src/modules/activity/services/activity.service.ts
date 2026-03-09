@@ -21,6 +21,16 @@ export class ActivityService {
     private readonly userModel: Model<UserDocument>,
   ) {}
 
+  private normalizeUpdatedValue(field: string, value: string): string {
+    if (field !== 'dueDate' || !value) {
+      return value;
+    }
+
+    const parsedDate = new Date(value);
+
+    return parsedDate.toDateString();
+  }
+
   async logTaskCreated(params: LogTaskCreatedParams): Promise<Activity> {
     const { taskId, byUserId, taskTitle } = params;
     return this.activityModel.create({
@@ -36,8 +46,12 @@ export class ActivityService {
   async logTaskUpdated(params: LogTaskUpdatedParams): Promise<Activity> {
     const { taskId, byUserId, changes } = params;
     const updatedFields: Record<string, { from: string; to: string }> = {};
+
     for (const c of changes) {
-      updatedFields[c.field] = { from: c.oldValue, to: c.newValue };
+      updatedFields[c.field] = {
+        from: this.normalizeUpdatedValue(c.field, c.oldValue),
+        to: this.normalizeUpdatedValue(c.field, c.newValue),
+      };
     }
 
     return this.activityModel.create({

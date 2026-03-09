@@ -9,6 +9,7 @@ import { ProjectService } from '../project/services/project.service';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { NotificationModule } from '../notification/notification.module';
 import { TasksModule } from '../tasks/tasks.module';
+import { StorageModule } from 'src/storage/storage.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { TasksModule } from '../tasks/tasks.module';
     AuthModule,
     NotificationModule,
     TasksModule,
+    StorageModule,
   ],
   controllers: [WorkspaceController],
   providers: [WorkspaceService, ProjectService],

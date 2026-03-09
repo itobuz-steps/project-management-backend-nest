@@ -16,10 +16,10 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { GetAllTasksDto } from './dto/get-all-tasks.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import type { AuthenticatedRequest } from 'src/type/common.type';
-import type { TaskFilters } from './interfaces/tasks.interface';
 import {
   CreateTaskDocs,
   GetAllTasksDocs,
@@ -72,7 +72,7 @@ export class TasksController {
   @GetAllTasksDocs()
   async findAll(
     @Req() req: AuthenticatedRequest,
-    @Query() query?: TaskFilters,
+    @Query() query?: GetAllTasksDto,
   ) {
     const result = await this.tasksService.findAll(
       req.user._id,

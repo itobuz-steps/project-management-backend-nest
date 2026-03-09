@@ -17,13 +17,19 @@ import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
 import type { AuthenticatedRequest } from 'src/type/common.type';
 
 @UseGuards(IsAuthenticated)
-@Controller('workspace')
+@Controller('workspaces')
 export class WorkspaceController {
   constructor(private readonly workspaceService: WorkspaceService) {}
 
   @Post()
-  async create(@Body() createWorkspaceDto: CreateWorkspaceDto) {
-    const result = await this.workspaceService.create(createWorkspaceDto);
+  async create(
+    @Body() createWorkspaceDto: CreateWorkspaceDto,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const result = await this.workspaceService.create(
+      createWorkspaceDto,
+      req.user.role,
+    );
     return {
       success: true,
       result,
@@ -36,12 +42,6 @@ export class WorkspaceController {
       req.user._id,
       req.user.role,
     );
-    return { success: true, result };
-  }
-
-  @Get(':id')
-  async findOne(@Param('id') id: string) {
-    const result = await this.workspaceService.findOne(id);
     return { success: true, result };
   }
 

@@ -2,9 +2,10 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Project } from '../schema/project.schema';
 import { CreateProjectDto } from '../dto/create-project.dto';
 import { UpdateProjectDto } from '../dto/update-project.dto';
@@ -12,6 +13,10 @@ import { generateProjectPrefix } from 'src/utils/project-prefix.util';
 import { ObjectIdLike } from 'src/type/common.type';
 import { NotificationPushService } from '../../notification/services/notification-push.service';
 import { Role } from '../../auth/types/auth.types';
+import { Task } from '../../tasks/entities/task.entity';
+import { InjectConnection } from '@nestjs/mongoose';
+import { Connection } from 'mongoose';
+import { StorageService } from 'src/storage/storage.service';
 
 @Injectable()
 export class ProjectService {
@@ -19,7 +24,14 @@ export class ProjectService {
     @InjectModel(Project.name)
     private readonly projectModel: Model<Project>,
 
+    @InjectModel('Task')
+    private readonly taskModel: Model<Task>,
+
+    @InjectConnection()
+    private readonly connection: Connection,
+
     private readonly notificationPushService: NotificationPushService,
+    private readonly storageService: StorageService,
   ) {}
 
   async getAllProjects(userId: ObjectIdLike, role: Role): Promise<Project[]> {
@@ -77,6 +89,7 @@ export class ProjectService {
     userId: ObjectIdLike,
     role: Role,
     dto: CreateProjectDto,
+    file?: Express.Multer.File,
   ): Promise<Project> {
     if (role !== Role.SUPERADMIN) {
       throw new ForbiddenException('Only superadmin can create projects');
@@ -84,11 +97,24 @@ export class ProjectService {
 
     const prefix = dto.prefix ?? generateProjectPrefix(dto.name);
 
+    let iconUrl: string | undefined;
+    let iconKey: string | undefined;
+
+    if (file) {
+      const uploadRes = await this.storageService.uploadSingleFile(file);
+
+      iconUrl = uploadRes.url;
+      iconKey = uploadRes.key;
+    }
+
     const project = new this.projectModel({
       ...dto,
+      prefix,
+      icon: iconUrl,
+      iconKey,
+      workspaceId: dto.workspaceId ? new Types.ObjectId(dto.workspaceId) : null,
       memberLead: userId,
       members: [{ user: userId, role: 'admin' }],
-      prefix,
     });
 
     const savedProject = await project.save();
@@ -107,45 +133,55 @@ export class ProjectService {
     role: Role,
     projectId: ObjectIdLike,
     update: UpdateProjectDto,
+    file?: Express.Multer.File,
   ): Promise<Project> {
-    if (role !== Role.SUPERADMIN) {
-      throw new ForbiddenException('Only superadmin can update projects');
-    }
-
-    const updatePayload = { ...update };
-
-    if (update.name) {
-      updatePayload.prefix = generateProjectPrefix(update.name);
-    }
-
-    const project = await this.projectModel.findOneAndUpdate(
-      {
-        _id: projectId,
-        members: {
-          $elemMatch: {
-            user: userId,
-            role: 'admin',
-          },
+    const project = await this.projectModel.findOne({
+      _id: projectId,
+      members: {
+        $elemMatch: {
+          user: userId,
+          role: 'admin',
         },
       },
-      updatePayload,
-      { new: true },
-    );
+    });
 
     if (!project) {
       throw new ForbiddenException('Not allowed to update this project');
     }
 
+    const updatePayload = { ...update };
+
+    if (file) {
+      const uploadRes = await this.storageService.uploadSingleFile(file);
+
+      if (project.iconKey) {
+        try {
+          await this.storageService.deleteFile(project.iconKey);
+        } catch (err) {
+          console.warn('Failed to delete old project icon', err);
+        }
+      }
+
+      updatePayload.icon = uploadRes.url;
+      updatePayload.iconKey = uploadRes.key;
+    }
+
+    const updatedProject = await this.projectModel.findByIdAndUpdate(
+      projectId,
+      { $set: updatePayload },
+      { new: true },
+    );
+
     await this.notificationPushService.pushNotificationToProjectMembers(
-      project._id,
+      projectId,
       {
-        title: `Project "${project.name}" Updated`,
-        message: `Project "${project.name}" was updated`,
-        projectId: project._id,
+        title: `Project "${updatedProject!.name}" Updated`,
+        message: `Project "${updatedProject!.name}" was updated`,
+        projectId: updatedProject!._id,
       },
     );
 
-    return project;
+    return updatedProject!;
   }
 
   async deleteProject(
@@ -159,12 +195,6 @@ export class ProjectService {
 
     const project = await this.projectModel.findOne({
       _id: projectId,
-      members: {
-        $elemMatch: {
-          user: userId,
-          role: 'admin',
-        },
-      },
     });
 
     if (!project) {
@@ -181,6 +211,44 @@ export class ProjectService {
     );
 
     await project.deleteOne();
+
+    return project;
+  }
+
+  async deleteColumn(
+    userId: ObjectIdLike,
+    role: Role,
+    projectId: ObjectIdLike,
+    columnName: string,
+  ): Promise<Project> {
+    if (role !== Role.SUPERADMIN) {
+      throw new ForbiddenException('Only superadmin can delete columns');
+    }
+
+    const project = await this.projectModel.findById(projectId);
+
+    if (!project) {
+      throw new NotFoundException('Project by given id not found');
+    }
+
+    if (!project.columns.includes(columnName)) {
+      throw new NotFoundException('Column not found');
+    }
+
+    const taskCount = await this.taskModel.countDocuments({
+      projectId: projectId,
+      status: columnName,
+    });
+
+    if (taskCount) {
+      throw new BadRequestException(
+        `Cannot delete column "${columnName}" because it contains ${taskCount} task(s).`,
+      );
+    }
+    // If no tasks, safe to delete
+    project.columns = project.columns.filter((col) => col !== columnName);
+
+    await project.save();
 
     return project;
   }

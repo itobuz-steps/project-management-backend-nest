@@ -261,6 +261,7 @@ export class AuthController {
         email: user.email,
         profileImage: user.profileImage,
         notificationPreferences: user.notificationPreferences,
+        role: user.role,
       },
     };
   }

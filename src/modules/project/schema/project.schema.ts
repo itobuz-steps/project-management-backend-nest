@@ -10,6 +10,12 @@ export class Project extends Document {
   @Prop({ required: true })
   name: string;
 
+  @Prop({ type: String, default: null })
+  icon?: string;
+
+  @Prop()
+  iconKey?: string;
+
   @Prop({ required: true, enum: ProjectType })
   projectType: ProjectType;
 
@@ -56,13 +62,18 @@ export class Project extends Document {
   })
   currentSprint: Types.ObjectId | null;
 
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null })
+  defaultAssignee?: Types.ObjectId;
+
+  @Prop({ type: String, default: 'indigo' })
+  theme: string;
+
   @Prop({
     type: Types.ObjectId,
     ref: 'Workspace',
-    required: true,
-    default: 'No Workspace',
+    default: null,
   })
-  workspace: Types.ObjectId;
+  workspaceId: Types.ObjectId | null;
 }
 
 export const ProjectSchema = SchemaFactory.createForClass(Project);

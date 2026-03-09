@@ -1,42 +1,106 @@
 import { Injectable, UnauthorizedException, UseGuards } from '@nestjs/common';
-import { CreateWorkspaceDto } from './dto/create-workspace.dto';
-import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Workspace } from './entities/workspace.entity';
-import { Model } from 'mongoose';
-import { ObjectIdLike } from 'src/type/common.type';
+import { Model, Types } from 'mongoose';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
+import { ObjectIdLike } from 'src/type/common.type';
 import { Role } from '../auth/types/auth.types';
 import { Project } from '../project/schema/project.schema';
-import { ProjectService } from '../project/services/project.service';
+import { CreateWorkspaceDto } from './dto/create-workspace.dto';
+import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
+import { Workspace } from './entities/workspace.entity';
 
 @UseGuards(IsAuthenticated)
 @Injectable()
 export class WorkspaceService {
   constructor(
     @InjectModel(Workspace.name) private workspaceModel: Model<Workspace>,
-    private readonly projectService: ProjectService,
   ) {}
-  async create(createWorkspaceDto: CreateWorkspaceDto) {
+
+  async create(createWorkspaceDto: CreateWorkspaceDto, role: Role) {
+    if (role !== Role.SUPERADMIN) {
+      throw new UnauthorizedException(
+        'Only super admins can create workspaces',
+      );
+    }
+
     const newWorkspace = await this.workspaceModel.create(createWorkspaceDto);
     return newWorkspace;
   }
 
   async findAll(userId: ObjectIdLike, role: Role) {
-    const userProjects = await this.projectService.getAllProjects(userId, role);
-    const workspaceIds = userProjects.map((project: Project) =>
-      project.workspace.toString(),
-    );
+    const normalizedUserId =
+      typeof userId === 'string' && Types.ObjectId.isValid(userId)
+        ? new Types.ObjectId(userId)
+        : userId;
 
-    const result = await this.workspaceModel.find({
-      _id: { $in: workspaceIds },
-    });
+    const pipeline = [
+      ...(role === Role.SUPERADMIN
+        ? [
+            {
+              $lookup: {
+                from: 'projects',
+                let: { workspaceId: '$_id' },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $eq: ['$workspaceId', '$$workspaceId'],
+                      },
+                    },
+                  },
+                ],
+                as: 'projects',
+              },
+            },
+          ]
+        : [
+            {
+              $lookup: {
+                from: 'projects',
+                let: { workspaceId: '$_id' },
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $eq: ['$workspaceId', '$$workspaceId'],
+                      },
+                    },
+                  },
+                  {
+                    $match: {
+                      'members.user': normalizedUserId,
+                    },
+                  },
+                ],
+                as: 'projects',
+              },
+            },
+            {
+              $match: {
+                $expr: {
+                  $gt: [{ $size: '$projects' }, 0],
+                },
+              },
+            },
+          ]),
+      {
+        $project: {
+          _id: 0,
+          workspaceId: '$_id',
+          workspaceName: '$name',
+          projects: 1,
+        },
+      },
+    ];
 
-    return result;
-  }
+    const result = await this.workspaceModel.aggregate<
+      {
+        workspaceId: Types.ObjectId;
+        workspaceName: string;
+        projects: Project[];
+      }[]
+    >(pipeline);
 
-  async findOne(id: ObjectIdLike) {
-    const result = await this.workspaceModel.findById(id);
     return result;
   }
 
@@ -50,6 +114,7 @@ export class WorkspaceService {
         'Only super admins can update workspaces',
       );
     }
+
     const result = await this.workspaceModel.findByIdAndUpdate(
       id,
       updateWorkspaceDto,

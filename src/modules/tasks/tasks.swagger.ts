@@ -8,7 +8,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { UpdateTaskDto } from './dto/update-task.dto';
-import { TASK_PRIORITIES } from 'src/constants/task.constants';
+import { TASK_PRIORITIES, TASK_TYPES } from 'src/constants/task.constants';
 
 // Common error response schema
 const ErrorResponse = {
@@ -141,6 +141,7 @@ export function GetAllTasksDocs() {
         'status',
         'priority',
         'dueDate',
+        'key',
         'createdAt',
         'updatedAt',
       ],
@@ -166,6 +167,13 @@ export function GetAllTasksDocs() {
       description: 'Filter tasks by status',
       example: 'in-progress',
       type: String,
+    }),
+    ApiQuery({
+      name: 'type',
+      required: false,
+      description: 'Filter tasks by type',
+      enum: TASK_TYPES,
+      example: 'task',
     }),
     ApiQuery({
       name: 'tags',

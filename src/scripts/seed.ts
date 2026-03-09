@@ -518,7 +518,13 @@ async function bootstrap() {
         let latestTimelineAt = taskCreatedAt;
 
         if (Math.random() < 0.3) {
-          task.attachments.push(pick(UNSPLASH_LINKS));
+          task.attachments.push({
+            url: pick(UNSPLASH_LINKS),
+            key: crypto.randomUUID(),
+            name: 'seed-image.jpg',
+            mimeType: 'image/jpeg',
+            size: 500000,
+          });
         }
 
         await task.save();

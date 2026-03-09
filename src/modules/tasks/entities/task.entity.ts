@@ -94,10 +94,24 @@ export class Task extends Document {
   subTasks: Types.ObjectId[];
 
   @Prop({
-    type: [String],
+    type: [
+      {
+        url: { type: String },
+        key: { type: String },
+        name: { type: String },
+        mimeType: { type: String },
+        size: { type: Number },
+      },
+    ],
     default: [],
   })
-  attachments: string[];
+  attachments: {
+    url: string;
+    key: string;
+    name: string;
+    mimeType: string;
+    size: number;
+  }[];
 
   @Prop({
     type: MongooseSchema.Types.ObjectId,

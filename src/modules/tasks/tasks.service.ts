@@ -101,7 +101,7 @@ export class TasksService {
       ...taskData,
       reporter: userId,
       key: `${project.prefix}-${project.lastKey + 1}`,
-      attachments: uploadRes ? uploadRes.map((res) => res.url) : [],
+      attachments: uploadRes ?? [],
     });
 
     project.lastKey += 1;
@@ -487,29 +487,24 @@ export class TasksService {
     > | null = null;
 
     if (newFiles.length) {
-      const uploadResults =
-        await this.storageService.uploadMultipleFiles(newFiles);
-      uploadRes = uploadResults;
+      uploadRes = await this.storageService.uploadMultipleFiles(newFiles);
     }
 
-    let attachments: string[] = [];
-    const urls = uploadRes ? uploadRes.map((res) => res.url) : [];
+    // NEW attachments uploaded to S3
+    const newAttachments = uploadRes ?? [];
 
-    if (updateTaskDto.existingAttachments?.length || urls.length) {
-      const currentAttachments = task.attachments ?? [];
-      // Determine which existing attachments to keep
-      let keptAttachments: string[];
-      if (updateTaskDto.existingAttachments) {
-        keptAttachments = updateTaskDto.existingAttachments.filter(
-          (f: string) => currentAttachments.includes(f),
-        );
-      } else {
-        keptAttachments = [...currentAttachments];
-      }
+    const currentAttachments = task.attachments ?? [];
 
-      // Merge with newly uploaded files
-      attachments = [...keptAttachments, ...urls];
+    let keptAttachments = currentAttachments;
+
+    if (updateTaskDto.existingAttachments) {
+      keptAttachments = currentAttachments.filter((att) =>
+        updateTaskDto.existingAttachments!.includes(att.key),
+      );
     }
+
+    // final attachments list
+    const attachments = [...keptAttachments, ...newAttachments];
 
     if (assignee !== undefined) {
       updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
@@ -547,6 +542,7 @@ export class TasksService {
         newStatus: updateTaskDto.status,
       });
     }
+
     if (updateTaskDto.assignee) {
       const oldAssigneeId = task.assignee?.toString() || null;
       const newAssigneeId = updateData.assignee?.toString() || null;

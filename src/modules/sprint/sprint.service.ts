@@ -85,7 +85,7 @@ export class SprintService {
   }
 
   async getAllSprints(): Promise<Sprint[]> {
-    return this.sprintModel.find();
+    return this.sprintModel.find().sort({ createdAt: 1 });
   }
 
   async getSprintById(params: SprintAccessParams): Promise<Sprint> {
@@ -123,7 +123,7 @@ export class SprintService {
       throw new ForbiddenException('Unauthorized');
     }
 
-    return this.sprintModel.find({ projectId });
+    return await this.sprintModel.find({ projectId }).sort({ createdAt: 1 });
   }
 
   async createSprint(

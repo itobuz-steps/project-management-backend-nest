@@ -92,6 +92,7 @@ export class CreateTaskDto {
     required: false,
   })
   @IsOptional()
+  @Transform(transformNullableMongoId)
   @IsMongoId()
   assignee?: string;
 

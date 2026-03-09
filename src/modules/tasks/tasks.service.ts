@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { GetAllTasksDto } from './dto/get-all-tasks.dto';
 import { Types } from 'mongoose';
 import mongoose, { HydratedDocument, Model, PipelineStage } from 'mongoose';
 import { Task } from './entities/task.entity';
@@ -13,7 +14,6 @@ import { Project } from '../project/schema/project.schema';
 import type { ObjectIdLike } from 'src/type/common.type';
 import {
   ProjectNotificationPayload,
-  TaskFilters,
   TaskStats,
   TRACKABLE_TASK_FIELDS,
   UserEmailPayload,
@@ -143,7 +143,7 @@ export class TasksService {
     return newTask;
   }
 
-  async findAll(userId: ObjectIdLike, role: Role, filter: TaskFilters = {}) {
+  async findAll(userId: ObjectIdLike, role: Role, filter: GetAllTasksDto = {}) {
     const page = Number(filter.page || 0);
     const limit = Number(filter.limit || 100);
     const skip = (page - 1) * limit;
@@ -221,16 +221,18 @@ export class TasksService {
       });
     }
 
-    if (filter.tags instanceof Array && filter.tags && filter.tags.length) {
+    if (filter.type) {
+      matchPipeline.push({
+        $match: {
+          type: filter.type,
+        },
+      });
+    }
+
+    if (filter.tags instanceof Array && filter.tags.length) {
       matchPipeline.push({
         $match: {
           tags: { $in: filter.tags },
-        },
-      });
-    } else if (typeof filter.tags === 'string' && filter.tags.length) {
-      matchPipeline.push({
-        $match: {
-          tags: { $in: [filter.tags] },
         },
       });
     }

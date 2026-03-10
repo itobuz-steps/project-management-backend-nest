@@ -49,6 +49,9 @@ export class StorageService {
         url: await this.getPresignedSignedUrl(key),
         key,
         uploadResult,
+        name: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
       };
     } catch (error) {
       throw new InternalServerErrorException(error);

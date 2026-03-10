@@ -9,7 +9,7 @@ import { ProjectService } from '../project/services/project.service';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { NotificationModule } from '../notification/notification.module';
 import { TasksModule } from '../tasks/tasks.module';
-import { StorageModule } from 'src/storage/storage.module';
+import { StorageModule } from '../../storage/storage.module';
 
 @Module({
   imports: [

@@ -30,6 +30,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { IsAuthenticated } from '../../middlewares/isAuthenticated';
 import { ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { StorageService } from 'src/storage/storage.service';
 
 type AuthenticatedRequest = Request & { user?: UserDocument };
 
@@ -40,6 +41,7 @@ export class AuthController {
     private readonly mailService: MailService,
     private readonly tokenGeneratorService: TokenGeneratorService,
     private readonly configService: ConfigService<AppConfig>,
+    private readonly storageService: StorageService,
   ) {}
   @Post('signup')
   async signup(@Body() signupDto: SignupDto) {
@@ -286,6 +288,7 @@ export class AuthController {
     const updateData: {
       name?: string;
       profileImage?: string;
+      profileImageKey?: string;
       notificationPreferences?: boolean;
     } = {};
 
@@ -306,7 +309,19 @@ export class AuthController {
     }
 
     if (profileImage) {
-      updateData.profileImage = profileImage.filename;
+      const uploadRes =
+        await this.storageService.uploadSingleFile(profileImage);
+
+      if (user.profileImageKey) {
+        try {
+          await this.storageService.deleteFile(user.profileImageKey);
+        } catch (err) {
+          console.warn('Failed to delete old profile image', err);
+        }
+      }
+
+      updateData.profileImage = uploadRes.url;
+      updateData.profileImageKey = uploadRes.key;
     }
 
     const updatedUser = await this.authService.updateProfile(

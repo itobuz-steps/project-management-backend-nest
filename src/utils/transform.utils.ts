@@ -1,8 +1,6 @@
 import { TransformFnParams } from 'class-transformer';
 
-export function transformToMongoIdArray({
-  value,
-}: TransformFnParams): string[] {
+export function transformToArray({ value }: TransformFnParams): string[] {
   if (!value) {
     return [];
   }

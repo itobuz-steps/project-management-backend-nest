@@ -21,6 +21,9 @@ export class User {
   @Prop({ type: String, default: null })
   profileImage: string | null;
 
+  @Prop({ type: String, default: null })
+  profileImageKey: string | null;
+
   @Prop([{ type: Types.ObjectId, ref: 'Project' }])
   projects: Types.ObjectId[];
 

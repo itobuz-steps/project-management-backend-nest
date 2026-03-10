@@ -496,12 +496,21 @@ export class TasksService {
     const currentAttachments = task.attachments ?? [];
 
     let keptAttachments = currentAttachments;
+    let deletedAttachments: typeof currentAttachments = [];
 
     if (updateTaskDto.existingAttachments) {
       keptAttachments = currentAttachments.filter((att) =>
         updateTaskDto.existingAttachments!.includes(att.key),
       );
+
+      deletedAttachments = currentAttachments.filter(
+        (att) => !updateTaskDto.existingAttachments!.includes(att.key),
+      );
     }
+
+    deletedAttachments.forEach((att) => {
+      void this.storageService.deleteFile(att.key);
+    });
 
     // final attachments list
     const attachments = [...keptAttachments, ...newAttachments];

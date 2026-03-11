@@ -69,6 +69,54 @@ export class TasksService {
     }
   }
 
+  private async syncLinkedTasks(task: Task, updateTaskDto: UpdateTaskDto) {
+    const relations = [
+      { field: 'blocks', inverse: 'blockedBy' },
+      { field: 'blockedBy', inverse: 'blocks' },
+      { field: 'relatesTo', inverse: 'relatesTo' },
+      { field: 'duplicates', inverse: 'duplicates' },
+    ] as const;
+
+    for (const { field, inverse } of relations) {
+      const newIds = updateTaskDto[field];
+
+      if (!newIds) {
+        continue;
+      }
+
+      const oldIds = (task[field] ?? []).map((id: Types.ObjectId) =>
+        id.toString(),
+      );
+
+      const newIdStrings = newIds.map((id: ObjectIdLike) => id.toString());
+
+      const added = newIdStrings.filter((id) => !oldIds.includes(id));
+      const removed = oldIds.filter((id) => !newIdStrings.includes(id));
+
+      if (added.length) {
+        await this.taskModel.updateMany(
+          { _id: { $in: added } },
+          {
+            $addToSet: {
+              [inverse]: task._id,
+            },
+          },
+        );
+      }
+
+      if (removed.length) {
+        await this.taskModel.updateMany(
+          { _id: { $in: removed } },
+          {
+            $pull: {
+              [inverse]: task._id,
+            },
+          },
+        );
+      }
+    }
+  }
+
   async create(
     userId: ObjectIdLike,
     role: Role,
@@ -469,6 +517,8 @@ export class TasksService {
     }
 
     await this.checkMembership(userId, role, task.projectId);
+
+    await this.syncLinkedTasks(task, updateTaskDto);
 
     type UpdateDataType = Omit<UpdateTaskDto, 'assignee'> & {
       assignee?: Types.ObjectId | null;

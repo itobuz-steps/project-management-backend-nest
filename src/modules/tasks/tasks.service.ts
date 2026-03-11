@@ -334,9 +334,26 @@ export class TasksService {
         ],
       },
     });
+
     populateStages.push({
       $unwind: {
         path: '$assignee',
+        preserveNullAndEmptyArrays: true,
+      },
+    });
+
+    populateStages.push({
+      $lookup: {
+        from: 'projects',
+        localField: 'projectId',
+        foreignField: '_id',
+        as: 'projectId',
+      },
+    });
+
+    populateStages.push({
+      $unwind: {
+        path: '$projectId',
         preserveNullAndEmptyArrays: true,
       },
     });
@@ -359,6 +376,7 @@ export class TasksService {
         ],
       },
     });
+
     populateStages.push({
       $unwind: {
         path: '$reporter',

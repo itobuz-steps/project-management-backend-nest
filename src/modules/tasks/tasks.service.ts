@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -544,12 +545,11 @@ export class TasksService {
 
     const { assignee, ...rest } = updateTaskDto;
 
-    const updateData: UpdateDataType = {
-      ...rest,
-    };
+    const updateData: UpdateDataType = { ...rest };
 
     delete updateData['existingAttachments'];
 
+    //FILE UPLOAD
     let uploadRes: Awaited<
       ReturnType<typeof this.storageService.uploadMultipleFiles>
     > | null = null;
@@ -558,9 +558,7 @@ export class TasksService {
       uploadRes = await this.storageService.uploadMultipleFiles(newFiles);
     }
 
-    // NEW attachments uploaded to S3
     const newAttachments = uploadRes ?? [];
-
     const currentAttachments = task.attachments ?? [];
 
     let keptAttachments = currentAttachments;
@@ -580,7 +578,6 @@ export class TasksService {
       void this.storageService.deleteFile(att.key);
     });
 
-    // final attachments list
     const attachments = [...keptAttachments, ...newAttachments];
 
     if (assignee !== undefined) {
@@ -593,8 +590,6 @@ export class TasksService {
       }
     });
 
-    const updatePayload = { ...updateData, attachments };
-
     const taskPopulate = [
       { path: 'assignee', select: 'name email profileImage' },
       { path: 'reporter', select: 'name email profileImage' },
@@ -604,6 +599,48 @@ export class TasksService {
       { path: 'duplicates', select: 'title key status type' },
     ];
 
+    // BLOCKER VALIDATION
+    const project = await this.projectModel.findById(task.projectId);
+    const finalStatus = project?.columns.at(-1);
+
+    let nextStatus = updateTaskDto.status ?? task.status;
+
+    if (task.duplicates?.length) {
+      const duplicateTasks = await this.taskModel.find({
+        _id: { $in: task.duplicates },
+      });
+
+      const duplicateDone = duplicateTasks.some(
+        (task) => task.status === finalStatus,
+      );
+
+      if (duplicateDone) {
+        nextStatus = finalStatus as string;
+      }
+    }
+
+    if (nextStatus === finalStatus && task.blockedBy?.length) {
+      const blockingTasks = await this.taskModel.find({
+        _id: { $in: task.blockedBy },
+      });
+
+      const unfinishedBlockers = blockingTasks.filter(
+        (task) => task.status !== finalStatus,
+      );
+
+      if (unfinishedBlockers.length) {
+        throw new BadRequestException(
+          `Task cannot be marked "${finalStatus}" because it is blocked by unfinished tasks.`,
+        );
+      }
+    }
+
+    if (nextStatus !== task.status) {
+      updateData.status = nextStatus;
+    }
+
+    const updatePayload = { ...updateData, attachments };
+
     const updatedTask = await this.taskModel
       .findByIdAndUpdate(id, updatePayload, {
         new: true,
@@ -611,7 +648,50 @@ export class TasksService {
       })
       .populate(taskPopulate);
 
-    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+    if (!updatedTask) {
+      throw new NotFoundException('Task not found after update');
+    }
+
+    if (updateData.status !== undefined && task.duplicates?.length) {
+      const duplicates = await this.taskModel.find({
+        _id: { $in: task.duplicates },
+      });
+
+      for (const dup of duplicates) {
+        if (dup.blockedBy?.length) {
+          const blockers = await this.taskModel.find({
+            _id: { $in: dup.blockedBy },
+          });
+
+          const unfinished = blockers.filter(
+            (blockTask) => blockTask.status !== finalStatus,
+          );
+
+          if (unfinished.length) {
+            throw new BadRequestException(
+              `Duplicate task "${dup.title}" cannot be marked "${finalStatus}" because it is blocked.`,
+            );
+          }
+        }
+      }
+
+      await this.taskModel.updateMany(
+        { _id: { $in: task.duplicates } },
+        { status: updateData.status },
+      );
+
+      await updatedTask.populate({
+        path: 'duplicates',
+        select: 'title key status type',
+      });
+    }
+
+    // ACTIVITY LOGS
+
+    if (
+      updateTaskDto.status !== undefined &&
+      task.status !== updateTaskDto.status
+    ) {
       await this.activityService.logStatusChange({
         taskId: task._id.toString(),
         byUserId: userId.toString(),
@@ -620,7 +700,7 @@ export class TasksService {
       });
     }
 
-    if (updateTaskDto.assignee) {
+    if (updateTaskDto.assignee !== undefined) {
       const oldAssigneeId = task.assignee?.toString() || null;
       const newAssigneeId = updateData.assignee?.toString() || null;
 
@@ -628,7 +708,7 @@ export class TasksService {
         await this.activityService.logAssigneeChange({
           taskId: task._id.toString(),
           byUserId: userId.toString(),
-          newAssigneeId: updateData.assignee?.toString() ?? null,
+          newAssigneeId,
         });
       }
     }
@@ -640,7 +720,7 @@ export class TasksService {
     const changes: { field: string; oldValue: string; newValue: string }[] = [];
 
     for (const field of trackableFields) {
-      if (updateTaskDto[field]) {
+      if (updateTaskDto[field] !== undefined) {
         const oldVal = String(task[field] ?? '');
         const newVal = String(updateTaskDto[field] ?? '');
 
@@ -668,7 +748,7 @@ export class TasksService {
       updateData.assignee.toString() !== userId.toString()
     ) {
       void this.notifyUserWithPreferences(
-        updateTaskDto.assignee as ObjectIdLike,
+        updateData.assignee,
         {
           title: `Task Assigned: "${task.title}"`,
           message: `You have been assigned to task "${task.title}"`,
@@ -676,13 +756,15 @@ export class TasksService {
           taskId: task._id,
         },
         {
-          projectName:
-            (await this.projectModel.findById(task.projectId))?.name || '',
+          projectName: project?.name || '',
         },
       );
     }
 
-    if (updateTaskDto.status && task.status !== updateTaskDto.status) {
+    if (
+      updateTaskDto.status !== undefined &&
+      task.status !== updateTaskDto.status
+    ) {
       const usersToNotify = new Set<string>();
 
       if (task.assignee && task.assignee.toString() !== userId.toString()) {
@@ -694,10 +776,8 @@ export class TasksService {
       }
 
       void Promise.all(
-        Array.from(usersToNotify).map(async (notifyUserId) => {
-          const project = await this.projectModel.findById(task.projectId);
-
-          return this.notifyUserWithPreferences(
+        Array.from(usersToNotify).map((notifyUserId) =>
+          this.notifyUserWithPreferences(
             notifyUserId,
             {
               title: `Task Status Updated: "${task.title}"`,
@@ -708,8 +788,8 @@ export class TasksService {
             {
               projectName: project?.name || '',
             },
-          );
-        }),
+          ),
+        ),
       );
     }
 

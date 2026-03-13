@@ -97,6 +97,16 @@ export class CreateTaskDto {
   assignee?: string;
 
   @ApiProperty({
+    description: 'User ID of the reporter',
+    example: '507f1f77bcf86cd799439014',
+    required: false,
+  })
+  @IsOptional()
+  @Transform(transformNullableMongoId)
+  @IsMongoId()
+  reporter?: string;
+
+  @ApiProperty({
     description: 'Story points for the task',
     example: 5,
     required: false,

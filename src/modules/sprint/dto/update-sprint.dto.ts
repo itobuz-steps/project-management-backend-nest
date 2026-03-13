@@ -14,6 +14,14 @@ export class UpdateSprintDto {
   dueDate?: Date;
 
   @IsOptional()
+  @IsDateString()
+  startDate?: Date;
+
+  @IsOptional()
+  @IsBoolean()
+  isStarted?: boolean;
+
+  @IsOptional()
   @IsBoolean()
   isCompleted?: boolean;
 

@@ -18,6 +18,9 @@ export class Sprint extends Document {
   @Prop({ default: false })
   isCompleted: boolean;
 
+  @Prop({ default: false })
+  isStarted: boolean;
+
   @Prop({ default: 0 })
   storyPoint: number;
 
@@ -32,6 +35,11 @@ export class Sprint extends Document {
     default: null,
   })
   endDate?: Date;
+
+  @Prop({
+    default: null,
+  })
+  startDate?: Date;
 
   createdAt: Date;
   updatedAt: Date;

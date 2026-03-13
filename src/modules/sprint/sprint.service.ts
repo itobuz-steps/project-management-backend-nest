@@ -85,7 +85,7 @@ export class SprintService {
   }
 
   async getAllSprints(): Promise<Sprint[]> {
-    return this.sprintModel.find().sort({ createdAt: 1 });
+    return this.sprintModel.find().sort({ startDate: 1, createdAt: 1 });
   }
 
   async getSprintById(params: SprintAccessParams): Promise<Sprint> {
@@ -123,7 +123,9 @@ export class SprintService {
       throw new ForbiddenException('Unauthorized');
     }
 
-    return await this.sprintModel.find({ projectId }).sort({ createdAt: 1 });
+    return await this.sprintModel
+      .find({ projectId })
+      .sort({ startDate: 1, createdAt: 1 });
   }
 
   async createSprint(
@@ -194,6 +196,17 @@ export class SprintService {
 
     if (!project) {
       throw new ForbiddenException('Unauthorized');
+    }
+
+    if (update.isStarted && !sprint.isStarted) {
+      update['startDate'] = update.startDate
+        ? new Date(update.startDate)
+        : new Date();
+      update['isStarted'] = true;
+    }
+    if (update.startDate && !sprint.startDate) {
+      update['startDate'] = new Date(update.startDate);
+      update['isStarted'] = true;
     }
 
     if (update.isCompleted && !sprint.isCompleted) {
@@ -389,11 +402,13 @@ export class SprintService {
       throw new ForbiddenException('Sprint not completed');
     }
 
+    const sprintStart = sprint.startDate || sprint.createdAt;
+
     const removedActivities = await this.activityModel.find({
       action: ActivityAction.REMOVED_FROM_SPRINT,
       'updatedFields.sprint.from': sprintId,
       createdAt: {
-        $gte: sprint.createdAt,
+        $gte: sprintStart,
         $lte: sprint.endDate,
       },
     });

@@ -13,6 +13,10 @@ export class CreateSprintDto {
   dueDate?: Date;
 
   @IsOptional()
+  @IsDateString()
+  startDate?: Date;
+
+  @IsOptional()
   @IsArray()
   @IsMongoId({ each: true })
   tasks?: string[];

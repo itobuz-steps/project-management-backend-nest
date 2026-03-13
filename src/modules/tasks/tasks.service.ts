@@ -539,11 +539,12 @@ export class TasksService {
 
     await this.syncLinkedTasks(task, updateTaskDto);
 
-    type UpdateDataType = Omit<UpdateTaskDto, 'assignee'> & {
+    type UpdateDataType = Omit<UpdateTaskDto, 'assignee' | 'reporter'> & {
       assignee?: Types.ObjectId | null;
+      reporter?: Types.ObjectId;
     };
 
-    const { assignee, ...rest } = updateTaskDto;
+    const { assignee, reporter, ...rest } = updateTaskDto;
 
     const updateData: UpdateDataType = { ...rest };
 
@@ -582,6 +583,10 @@ export class TasksService {
 
     if (assignee !== undefined) {
       updateData.assignee = assignee ? new Types.ObjectId(assignee) : null;
+    }
+
+    if (reporter !== undefined) {
+      updateData.reporter = new Types.ObjectId(reporter);
     }
 
     Object.keys(updateData).forEach((key) => {

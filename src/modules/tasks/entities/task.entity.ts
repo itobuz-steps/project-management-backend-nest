@@ -151,6 +151,9 @@ export class Task extends Document {
     },
   ])
   duplicates: Types.ObjectId[];
+
+  @Prop({ type: Number, default: 0 })
+  estimatedTimeInHours: number;
 }
 
 export const TaskSchema = SchemaFactory.createForClass(Task);

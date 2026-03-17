@@ -125,4 +125,43 @@ export class TasksController {
     );
     return { success: true, result };
   }
+
+  @Post(':taskId/start-timer')
+  async startTimer(
+    @Param('taskId') taskId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const result = await this.tasksService.startTimer(
+      req.user._id,
+      req.user.role,
+      taskId,
+    );
+    return { success: true, result };
+  }
+
+  @Patch('stop-timer/:worklogId')
+  async stopTimer(
+    @Param('worklogId') worklogId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const result = await this.tasksService.stopTimer(
+      req.user._id,
+      req.user.role,
+      worklogId,
+    );
+    return { success: true, result };
+  }
+
+  @Get(':taskId/worklogs')
+  async getWorklogs(
+    @Param('taskId') taskId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const result = await this.tasksService.getWorklogsForTask(
+      req.user._id,
+      req.user.role,
+      taskId,
+    );
+    return { success: true, result };
+  }
 }

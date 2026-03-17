@@ -25,6 +25,7 @@ import { Role } from '../auth/types/auth.types';
 import { StorageService } from 'src/storage/storage.service';
 import { User } from '../auth/schemas/user.schema';
 import { MailService } from 'src/utils/sendVerificationMail';
+import { Worklog } from './entities/worklog.entity';
 
 @Injectable()
 export class TasksService {
@@ -32,6 +33,7 @@ export class TasksService {
     @InjectModel(Task.name) private readonly taskModel: Model<Task>,
     @InjectModel(Project.name) private readonly projectModel: Model<Project>,
     @InjectModel(User.name) private readonly userModel: Model<User>,
+    @InjectModel(Worklog.name) private readonly worklogModel: Model<Worklog>,
     private readonly activityService: ActivityService,
     private readonly notificationPushService: NotificationPushService,
     private readonly storageService: StorageService,
@@ -1128,5 +1130,64 @@ export class TasksService {
         completedTasksGroupedByProject: [],
       }
     );
+  }
+
+  async startTimer(userId: ObjectIdLike, role: Role, taskId: string) {
+    const task = await this.taskModel.findById(taskId);
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    await this.checkMembership(userId, role, task.projectId);
+
+    const newWorklog = await this.worklogModel.create({
+      taskId: task._id,
+      userId: new mongoose.Types.ObjectId(userId.toString()),
+      startTime: new Date(),
+    });
+
+    return newWorklog;
+  }
+
+  async stopTimer(userId: ObjectIdLike, role: Role, worklogId: string) {
+    const worklog = await this.worklogModel.findById(worklogId);
+
+    if (!worklog) {
+      throw new NotFoundException('Worklog not found');
+    }
+
+    if (worklog.userId.toString() !== userId.toString()) {
+      throw new UnauthorizedException('Task is not started by this user');
+    }
+
+    const task = await this.taskModel.findById(worklog.taskId);
+
+    if (!task) {
+      throw new NotFoundException('Associated task not found');
+    }
+
+    await this.checkMembership(userId, role, task.projectId);
+
+    worklog.endTime = new Date();
+    await worklog.save();
+
+    return worklog;
+  }
+
+  async getWorklogsForTask(userId: ObjectIdLike, role: Role, taskId: string) {
+    const task = await this.taskModel.findById(taskId);
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    await this.checkMembership(userId, role, task.projectId);
+
+    const worklogs = await this.worklogModel
+      .find({ taskId: task._id })
+      .populate('userId', 'name email profileImage');
+
+    return worklogs;
   }
 }

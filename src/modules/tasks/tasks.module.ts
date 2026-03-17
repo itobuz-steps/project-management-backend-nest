@@ -11,6 +11,7 @@ import { ActivityModule } from '../activity/activity.module';
 import { ProjectService } from '../project/services/project.service';
 import { StorageModule } from 'src/storage/storage.module';
 import { User, UserSchema } from '../auth/schemas/user.schema';
+import { Worklog, WorklogSchema } from './entities/worklog.entity';
 
 @Module({
   controllers: [TasksController],
@@ -26,6 +27,7 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
     MongooseModule.forFeature([{ name: Task.name, schema: TaskSchema }]),
     MongooseModule.forFeature([{ name: Project.name, schema: ProjectSchema }]),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([{ name: Worklog.name, schema: WorklogSchema }]),
     JwtModule.register({}),
     AuthModule,
     NotificationModule,

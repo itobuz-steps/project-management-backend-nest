@@ -17,6 +17,9 @@ import { Role } from '../auth/types/auth.types';
 import { StorageService } from 'src/storage/storage.service';
 import { User } from '../auth/schemas/user.schema';
 import { MailService } from 'src/mail/mail.service';
+import { AppConfig } from 'src/config/app.config';
+import { ConfigService } from '@nestjs/config';
+import { parseCommentContent } from './parseCommentContent';
 
 @Injectable()
 export class CommentService {
@@ -29,7 +32,18 @@ export class CommentService {
     private readonly activityService: ActivityService,
     private readonly storageService: StorageService,
     private readonly mailService: MailService,
+    private readonly configService: ConfigService<AppConfig>,
   ) {}
+
+  private buildTaskUrl(taskId: string) {
+    const baseUrl = this.configService.get<string>('FRONTEND_URL');
+
+    if (!baseUrl) {
+      throw new Error('FRONTEND_URL is not defined');
+    }
+
+    return `${baseUrl}/task/${taskId}`;
+  }
 
   async getCommentsByTaskId(
     userId: ObjectIdLike,
@@ -59,8 +73,12 @@ export class CommentService {
       attachment = uploadResult.url;
     }
 
+    const parsed = parseCommentContent(createCommentDto.message);
+
     const newComment = await this.commentModel.create({
       ...createCommentDto,
+      message: createCommentDto.message,
+      parsedText: parsed.text,
       attachment,
       taskId,
       author: userId,
@@ -115,14 +133,17 @@ export class CommentService {
             const project = await this.projectModel.findById(task.projectId);
             const author = await this.userModel.findById(userId);
 
-            await this.mailService.sendNotificationMail(
+            await this.mailService.sendTemplateMail(
               user.email,
               `New Comment on "${task.title}"`,
+              'comment',
               {
-                title: `New Comment on "${task.title}"`,
-                message: `${author?.name} commented on a task.`,
-                highlightText: createCommentDto.message,
+                taskTitle: task.title,
                 projectName: project?.name,
+                actorName: author?.name || 'Someone',
+                commentText: parsed.text,
+                isMention: createCommentDto.mentions?.includes(notifyUserId),
+                taskUrl: this.buildTaskUrl(task._id.toString()),
               },
             );
           }
@@ -174,9 +195,16 @@ export class CommentService {
       (id) => !oldMentions.has(id) && id !== userId.toString(),
     );
 
+    const parsed = parseCommentContent(
+      updateCommentDto.message ?? comment.message,
+    );
+
     const updatedComment = await this.commentModel.findByIdAndUpdate(
       commentId,
-      updateCommentDto,
+      {
+        ...updateCommentDto,
+        parsedText: parsed.text,
+      },
       { new: true },
     );
 
@@ -200,14 +228,17 @@ export class CommentService {
               const commenter = await this.userModel.findById(userId);
               const project = await this.projectModel.findById(task.projectId);
 
-              await this.mailService.sendNotificationMail(
+              await this.mailService.sendTemplateMail(
                 user.email,
-                `New Comment on "${task.title}"`,
+                `You were mentioned in "${task.title}"`,
+                'comment',
                 {
-                  title: `New Comment on "${task.title}"`,
-                  message: `${commenter?.name} commented on a task.`,
-                  highlightText: updateCommentDto.message,
+                  taskTitle: task.title,
                   projectName: project?.name,
+                  actorName: commenter?.name || 'Someone',
+                  commentText: parsed.text,
+                  isMention: true,
+                  taskUrl: this.buildTaskUrl(task._id.toString()),
                 },
               );
             }

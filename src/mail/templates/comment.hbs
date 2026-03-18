@@ -1,0 +1,66 @@
+<div
+  style='font-family: Arial, sans-serif; max-width:600px; margin:auto; background:#ffffff; border:1px solid #eee; border-radius:10px; padding:20px;'
+>
+
+  <h2 style='color:#1a73e8; margin-bottom:10px;'>
+    New Comment
+  </h2>
+
+  <p style='color:#555; font-size:14px;'>
+    A new comment has been added to the following task:
+  </p>
+
+  <div
+    style='margin-top:20px; padding:16px; border-radius:8px; background:#f5f9ff; border:1px solid #e3f2fd;'
+  >
+    <h3 style='margin:0 0 10px 0; color:#333;'>
+      {{taskTitle}}
+    </h3>
+
+    {{#if projectName}}
+      <p style='margin:5px 0; font-size:13px; color:#555;'>
+        Project:
+        <strong>{{projectName}}</strong>
+      </p>
+    {{/if}}
+  </div>
+
+  {{#if isMention}}
+    <p style='margin-top:15px; font-size:14px; color:#1a73e8;'>
+      You were mentioned in this comment
+    </p>
+  {{/if}}
+
+  <div
+    style='margin-top:15px; padding:14px; background:#fafafa; border-radius:6px; border:1px solid #eee;'
+  >
+    <p style='margin:0; font-size:14px; color:#333;'>
+      {{commentText}}
+    </p>
+  </div>
+
+  {{#if actorName}}
+    <p style='margin-top:15px; font-size:14px; color:#555;'>
+      Commented by:
+      <strong>{{actorName}}</strong>
+    </p>
+  {{/if}}
+
+  {{#if taskUrl}}
+    <div style='margin-top:20px;'>
+      <a
+        href='{{taskUrl}}'
+        style='background:#1a73e8; color:#fff; padding:10px 18px; border-radius:6px; text-decoration:none; font-size:14px;'
+      >
+        View Task
+      </a>
+    </div>
+  {{/if}}
+
+  <hr style='margin:20px 0; border:none; border-top:1px solid #eee;' />
+
+  <p style='font-size:12px; color:#999; text-align:center;'>
+    Stay updated by checking your tasks regularly.
+  </p>
+
+</div>

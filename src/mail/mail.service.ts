@@ -69,12 +69,14 @@ export class MailService {
 
   async sendTaskOverdueMail(
     email: string,
+    taskKey: string,
     taskTitle: string,
     projectName: string,
     taskId: string,
   ): Promise<void> {
     try {
       const html = TemplateService.compile('overdue', {
+        taskKey,
         taskTitle,
         projectName,
         taskUrl: this.buildTaskUrl(taskId),

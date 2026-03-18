@@ -65,6 +65,7 @@ export class NotificationCronService {
           if (assignee.notificationPreferences?.email && assignee.email) {
             await this.mailService.sendTaskOverdueMail(
               assignee.email,
+              task.key,
               task.title,
               project.name,
               task._id.toString(),
@@ -78,6 +79,7 @@ export class NotificationCronService {
           if (reporter.notificationPreferences?.email && reporter.email) {
             await this.mailService.sendTaskOverdueMail(
               reporter.email,
+              task.key,
               task.title,
               project.name,
               task._id.toString(),

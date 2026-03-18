@@ -138,6 +138,7 @@ export class CommentService {
               `New Comment on "${task.title}"`,
               'comment',
               {
+                taskKey: task.key,
                 taskTitle: task.title,
                 projectName: project?.name,
                 actorName: author?.name || 'Someone',
@@ -233,6 +234,7 @@ export class CommentService {
                 `You were mentioned in "${task.title}"`,
                 'comment',
                 {
+                  taskKey: task.key,
                   taskTitle: task.title,
                   projectName: project?.name,
                   actorName: commenter?.name || 'Someone',

@@ -25,6 +25,8 @@ import { ProjectType } from '../project/type/project.types';
 import { MailService } from 'src/mail/mail.service';
 import { User } from '../auth/schemas/user.schema';
 import { ActivityService } from '../activity/services/activity.service';
+import { ConfigService } from '@nestjs/config';
+import { AppConfig } from 'src/config/app.config';
 
 @Injectable()
 export class SprintService {
@@ -41,7 +43,18 @@ export class SprintService {
     private readonly mailService: MailService,
     private readonly notificationPushService: NotificationPushService,
     private readonly activityService: ActivityService,
+    private readonly configService: ConfigService<AppConfig>,
   ) {}
+
+  private buildProjectUrl(projectId: string) {
+    const baseUrl = this.configService.get<string>('FRONTEND_URL');
+
+    if (!baseUrl) {
+      throw new Error('FRONTEND_URL is not defined');
+    }
+
+    return `${baseUrl}/project/${projectId}/backlog`;
+  }
 
   private async notifyProjectMembersWithEmail(
     project: Project,
@@ -172,6 +185,7 @@ export class SprintService {
           sprintKey: sprint.key,
           projectName: project.name,
           action: 'A new sprint has been created.',
+          projectUrl: this.buildProjectUrl(project._id.toString()),
         },
       },
     );
@@ -254,6 +268,7 @@ export class SprintService {
             sprintKey: sprint.key,
             projectName: project.name,
             action: 'Sprint details have been started.',
+            projectUrl: this.buildProjectUrl(project._id.toString()),
           },
         },
       );
@@ -275,6 +290,7 @@ export class SprintService {
             sprintKey: sprint.key,
             projectName: project.name,
             action: 'Sprint details have been completed.',
+            projectUrl: this.buildProjectUrl(project._id.toString()),
           },
         },
       );
@@ -317,6 +333,7 @@ export class SprintService {
         data: {
           sprintKey: sprint.key,
           projectName: project.name,
+          projectUrl: this.buildProjectUrl(project._id.toString()),
         },
       },
     );
@@ -373,6 +390,7 @@ export class SprintService {
           sprintKey: updatedSprint.key,
           projectName: project.name,
           changeText: `${tasks.length} task(s) added to the sprint.`,
+          projectUrl: this.buildProjectUrl(project._id.toString()),
         },
       },
     );
@@ -426,6 +444,7 @@ export class SprintService {
           sprintKey: updatedSprint.key,
           projectName: project.name,
           changeText: `A task was removed from the sprint.`,
+          projectUrl: this.buildProjectUrl(project._id.toString()),
         },
       },
     );

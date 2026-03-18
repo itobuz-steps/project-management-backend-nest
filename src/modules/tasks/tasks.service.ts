@@ -203,6 +203,7 @@ export class TasksService {
           template: 'assignee',
           subject: 'New Task Assigned',
           data: {
+            taskKey: newTask.key,
             taskTitle: newTask.title,
             projectName: project.name,
             actorName: actor?.name || 'Someone',
@@ -789,6 +790,7 @@ export class TasksService {
           template: 'assignee',
           subject: 'Task Assigned',
           data: {
+            taskKey: task.key,
             taskTitle: task.title,
             projectName: project?.name || '',
             actorName: actor?.name || 'Someone',
@@ -826,11 +828,13 @@ export class TasksService {
               template: 'task-status',
               subject: 'Task Status Updated',
               data: {
+                taskKey: task.key,
                 taskTitle: task.title,
                 oldStatus: task.status,
                 newStatus: updateTaskDto.status,
                 projectName: project?.name || '',
                 actorName: actor?.name || 'Someone',
+                taskUrl: this.buildTaskUrl(task._id.toString()),
               },
             },
           ),
@@ -876,6 +880,7 @@ export class TasksService {
             template: 'task-delete',
             subject: 'Task Deleted',
             data: {
+              taskKey: task.key,
               taskTitle: task.title,
               projectName: project?.name || '',
               actorName: actor?.name || 'Someone',

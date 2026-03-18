@@ -67,6 +67,7 @@ export class NotificationCronService {
               assignee.email,
               task.title,
               project.name,
+              task._id.toString(),
             );
           }
         }
@@ -79,6 +80,7 @@ export class NotificationCronService {
               reporter.email,
               task.title,
               project.name,
+              task._id.toString(),
             );
           }
         }

@@ -25,10 +25,11 @@ export class InviteUserController {
   @Post('/:projectId/invites/send')
   @Roles(ProjectRole.ADMIN)
   inviteUsers(
+    @Req() req: AuthenticatedRequest,
     @Param('projectId') projectId: string,
     @Body() dto: InviteUserDto,
   ) {
-    return this.inviteUserService.inviteUsers(projectId, dto);
+    return this.inviteUserService.inviteUsers(projectId, dto, req.user._id);
   }
 
   @Get('invites/accept')

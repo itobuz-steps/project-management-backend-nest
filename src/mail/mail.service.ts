@@ -2,14 +2,28 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MailSender } from './mailSender';
 import { TemplateService } from './template.service';
 import { NotificationEmailTemplate } from './mail.types';
+import { AppConfig } from 'src/config/app.config';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
 
-  constructor(private readonly mailSender: MailSender) {}
+  constructor(
+    private readonly mailSender: MailSender,
+    private readonly configService: ConfigService<AppConfig>,
+  ) {}
 
-  // ✅ VERIFICATION
+  private buildTaskUrl(taskId: string) {
+    const baseUrl = this.configService.get<string>('FRONTEND_URL');
+
+    if (!baseUrl) {
+      throw new Error('FRONTEND_URL is not defined');
+    }
+
+    return `${baseUrl}/task/${taskId}`;
+  }
+
   async sendVerificationMail(
     email: string,
     otpValue: string | number,
@@ -28,14 +42,24 @@ export class MailService {
     }
   }
 
-  // ✅ INVITATION
-  async sendInvitationMail(email: string, token: string): Promise<void> {
+  async sendInvitationMail(
+    email: string,
+    token: string,
+    projectName: string,
+    inviterName?: string,
+  ): Promise<void> {
     try {
       const html = TemplateService.compile('invitation', {
-        inviteLink: `http://localhost:5173/invite/join?token=${token}`,
+        inviteLink: this.buildTaskUrl(token),
+        projectName,
+        inviterName,
       });
 
-      await this.mailSender.sendMail(email, 'Project Invitation', html);
+      await this.mailSender.sendMail(
+        email,
+        `🎉 You're invited to join ${projectName}`,
+        html,
+      );
 
       this.logger.log(`Invitation email sent to ${email}`);
     } catch (error) {
@@ -44,21 +68,22 @@ export class MailService {
     }
   }
 
-  // ✅ OVERDUE
   async sendTaskOverdueMail(
     email: string,
     taskTitle: string,
     projectName: string,
+    taskId: string,
   ): Promise<void> {
     try {
       const html = TemplateService.compile('overdue', {
         taskTitle,
         projectName,
+        taskUrl: this.buildTaskUrl(taskId),
       });
 
       await this.mailSender.sendMail(
         email,
-        `Task Overdue - ${projectName}`,
+        `⚠ Task Overdue - ${taskTitle}`,
         html,
       );
 
@@ -69,7 +94,6 @@ export class MailService {
     }
   }
 
-  // ✅ NOTIFICATION
   async sendNotificationMail(
     email: string,
     subject: string,

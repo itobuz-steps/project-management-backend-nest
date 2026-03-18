@@ -17,6 +17,7 @@ import { User } from '../../auth/schemas/user.schema';
 import { InviteUserDto } from './../dto/invite-user.dto';
 import { Project } from './../schema/project.schema';
 import { ProjectRole, InvitePayload } from './../type/project.types';
+import { ObjectIdLike } from 'src/type/common.type';
 
 @Injectable()
 export class InviteUserService {
@@ -30,7 +31,7 @@ export class InviteUserService {
     private readonly configService: ConfigService<AppConfig>,
   ) {}
 
-  async inviteUsers(projectId: string, dto: InviteUserDto) {
+  async inviteUsers(projectId: string, dto: InviteUserDto, id?: ObjectIdLike) {
     const { email } = dto;
 
     const project = await this.projectModel.findById(projectId);
@@ -71,7 +72,14 @@ export class InviteUserService {
       },
     );
 
-    await this.mailService.sendInvitationMail(email, token);
+    const inviter = await this.userModel.findById(id);
+
+    await this.mailService.sendInvitationMail(
+      email,
+      token,
+      project.name,
+      inviter?.name || 'Someone',
+    );
 
     return {
       success: true,

@@ -20,6 +20,7 @@ export interface AppConfig {
   S3_SECRET_ACCESS_KEY: string;
   S3_REGION: string;
   S3_BUCKET_NAME: string;
+  FRONTEND_URL: string;
 }
 
 export default registerAs('app', (): AppConfig => {
@@ -47,6 +48,9 @@ export default registerAs('app', (): AppConfig => {
   if (!process.env.S3_BUCKET_NAME) {
     throw new Error('S3 bucket name is not provided');
   }
+  if (!process.env.FRONTEND_URL) {
+    throw new Error('Frontend URL is not provided');
+  }
 
   return {
     PORT: Number(process.env.PORT) || 3001,
@@ -70,5 +74,6 @@ export default registerAs('app', (): AppConfig => {
     S3_SECRET_ACCESS_KEY: process.env.S3_SECRET_ACCESS_KEY,
     S3_REGION: process.env.S3_REGION,
     S3_BUCKET_NAME: process.env.S3_BUCKET_NAME,
+    FRONTEND_URL: process.env.FRONTEND_URL,
   };
 });

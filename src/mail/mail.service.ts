@@ -85,4 +85,14 @@ export class MailService {
       this.logger.error(`Failed to send notification email`, error);
     }
   }
+
+  async sendTemplateMail(
+    email: string,
+    subject: string,
+    template: string,
+    payload: unknown,
+  ) {
+    const html = TemplateService.compile(template, payload);
+    await this.mailSender.sendMail(email, subject, html);
+  }
 }

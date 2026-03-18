@@ -12,6 +12,12 @@
         }
       }
     ],
-    "deleteOutDir": true
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "mail/templates/**/*",
+        "outDir": "dist"
+      }
+    ]
   }
 }

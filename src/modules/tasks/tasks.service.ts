@@ -17,15 +17,16 @@ import {
   ProjectNotificationPayload,
   TaskStats,
   TRACKABLE_TASK_FIELDS,
-  UserEmailPayload,
 } from './interfaces/tasks.interface';
 import { NotificationPushService } from '../notification/services/notification-push.service';
 import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
 import { StorageService } from 'src/storage/storage.service';
 import { User } from '../auth/schemas/user.schema';
-import { MailService } from 'src/utils/sendVerificationMail';
+import { MailService } from 'src/mail/mail.service';
 import { Worklog } from './entities/worklog.entity';
+import { ConfigService } from '@nestjs/config';
+import { AppConfig } from 'src/config/app.config';
 
 @Injectable()
 export class TasksService {
@@ -38,12 +39,27 @@ export class TasksService {
     private readonly notificationPushService: NotificationPushService,
     private readonly storageService: StorageService,
     private readonly mailService: MailService,
+    private readonly configService: ConfigService<AppConfig>,
   ) {}
+
+  private buildTaskUrl(taskId: string) {
+    const baseUrl = this.configService.get<string>('FRONTEND_URL');
+
+    if (!baseUrl) {
+      throw new Error('FRONTEND_URL is not defined');
+    }
+
+    return `${baseUrl}/task/${taskId}`;
+  }
 
   private async notifyUserWithPreferences(
     userId: ObjectIdLike,
     payload: ProjectNotificationPayload,
-    emailPayload?: UserEmailPayload,
+    emailOptions?: {
+      template: string;
+      subject: string;
+      data: unknown;
+    },
   ) {
     try {
       await this.notificationPushService.pushNotificationToUser(
@@ -51,19 +67,15 @@ export class TasksService {
         payload,
       );
 
-      if (emailPayload) {
+      if (emailOptions) {
         const user = await this.userModel.findById(userId);
 
         if (user?.notificationPreferences?.email && user.email) {
-          await this.mailService.sendNotificationMail(
+          await this.mailService.sendTemplateMail(
             user.email,
-            payload.title,
-            {
-              title: payload.message,
-              message: payload.message,
-              highlightText: emailPayload.highlightText,
-              projectName: emailPayload.projectName,
-            },
+            emailOptions.subject,
+            emailOptions.template,
+            emailOptions.data,
           );
         }
       }
@@ -132,6 +144,8 @@ export class TasksService {
       createTaskDto.projectId,
     );
 
+    const actor = await this.userModel.findById(userId);
+
     // Prepare task data and filter out invalid assignee values
     const taskData = { ...createTaskDto };
     if (!taskData.assignee || taskData.assignee === '') {
@@ -186,7 +200,15 @@ export class TasksService {
           taskId: newTask._id,
         },
         {
-          projectName: project.name,
+          template: 'assignee',
+          subject: 'New Task Assigned',
+          data: {
+            taskKey: newTask.key,
+            taskTitle: newTask.title,
+            projectName: project.name,
+            actorName: actor?.name || 'Someone',
+            taskUrl: this.buildTaskUrl(newTask._id.toString()),
+          },
         },
       );
     }
@@ -539,6 +561,8 @@ export class TasksService {
 
     await this.checkMembership(userId, role, task.projectId);
 
+    const actor = await this.userModel.findById(userId);
+
     await this.syncLinkedTasks(task, updateTaskDto);
 
     type UpdateDataType = Omit<UpdateTaskDto, 'assignee' | 'reporter'> & {
@@ -763,7 +787,15 @@ export class TasksService {
           taskId: task._id,
         },
         {
-          projectName: project?.name || '',
+          template: 'assignee',
+          subject: 'Task Assigned',
+          data: {
+            taskKey: task.key,
+            taskTitle: task.title,
+            projectName: project?.name || '',
+            actorName: actor?.name || 'Someone',
+            taskUrl: this.buildTaskUrl(task._id.toString()),
+          },
         },
       );
     }
@@ -793,7 +825,17 @@ export class TasksService {
               taskId: task._id,
             },
             {
-              projectName: project?.name || '',
+              template: 'task-status',
+              subject: 'Task Status Updated',
+              data: {
+                taskKey: task.key,
+                taskTitle: task.title,
+                oldStatus: task.status,
+                newStatus: updateTaskDto.status,
+                projectName: project?.name || '',
+                actorName: actor?.name || 'Someone',
+                taskUrl: this.buildTaskUrl(task._id.toString()),
+              },
             },
           ),
         ),
@@ -811,6 +853,8 @@ export class TasksService {
     }
 
     await this.checkMembership(userId, role, task.projectId);
+
+    const actor = await this.userModel.findById(userId);
 
     // Notify assignee and reporter about task deletion
     const usersToNotify = new Set<string>();
@@ -833,7 +877,14 @@ export class TasksService {
             projectId: task.projectId,
           },
           {
-            projectName: project?.name || '',
+            template: 'task-delete',
+            subject: 'Task Deleted',
+            data: {
+              taskKey: task.key,
+              taskTitle: task.title,
+              projectName: project?.name || '',
+              actorName: actor?.name || 'Someone',
+            },
           },
         );
       }),

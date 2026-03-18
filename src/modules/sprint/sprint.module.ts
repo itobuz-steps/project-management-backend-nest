@@ -12,6 +12,7 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
 import { ActivityModule } from '../activity/activity.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { StorageModule } from 'src/storage/storage.module';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { StorageModule } from 'src/storage/storage.module';
     ActivityModule,
     TasksModule,
     StorageModule,
+    MailModule,
   ],
   controllers: [SprintController],
   providers: [

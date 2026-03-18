@@ -20,12 +20,13 @@ import {
   SprintIdParams,
   SprintAccessParams,
   ProjectNotificationPayload,
-  ProjectEmailPayload,
 } from './type/sprint.types';
 import { ProjectType } from '../project/type/project.types';
-import { MailService } from 'src/utils/sendVerificationMail';
+import { MailService } from 'src/mail/mail.service';
 import { User } from '../auth/schemas/user.schema';
 import { ActivityService } from '../activity/services/activity.service';
+import { ConfigService } from '@nestjs/config';
+import { AppConfig } from 'src/config/app.config';
 
 @Injectable()
 export class SprintService {
@@ -42,12 +43,27 @@ export class SprintService {
     private readonly mailService: MailService,
     private readonly notificationPushService: NotificationPushService,
     private readonly activityService: ActivityService,
+    private readonly configService: ConfigService<AppConfig>,
   ) {}
+
+  private buildProjectUrl(projectId: string) {
+    const baseUrl = this.configService.get<string>('FRONTEND_URL');
+
+    if (!baseUrl) {
+      throw new Error('FRONTEND_URL is not defined');
+    }
+
+    return `${baseUrl}/project/${projectId}/backlog`;
+  }
 
   private async notifyProjectMembersWithEmail(
     project: Project,
     payload: ProjectNotificationPayload,
-    emailPayload?: ProjectEmailPayload,
+    emailPayload?: {
+      template: string;
+      subject: string;
+      data: unknown;
+    },
   ) {
     try {
       await this.notificationPushService.pushNotificationToProjectMembers(
@@ -55,7 +71,6 @@ export class SprintService {
         payload,
       );
 
-      // 📧 Email
       if (emailPayload) {
         const memberIds = project.members.map((m) => m.user);
 
@@ -66,15 +81,11 @@ export class SprintService {
 
         void Promise.all(
           users.map((user) =>
-            this.mailService.sendNotificationMail(
+            this.mailService.sendTemplateMail(
               user.email,
               emailPayload.subject,
-              {
-                title: emailPayload.title,
-                message: payload.message,
-                highlightText: emailPayload.highlightText,
-                projectName: project.name,
-              },
+              emailPayload.template,
+              emailPayload.data,
             ),
           ),
         );
@@ -167,9 +178,15 @@ export class SprintService {
         projectId: project._id,
       },
       {
-        subject: `Sprint Created`,
-        title: `Sprint ${sprint.key} Created`,
-        highlightText: `Sprint ${sprint.key}`,
+        template: 'sprint-update',
+        subject: 'Sprint Created',
+        data: {
+          sprintTitle: 'Sprint Created',
+          sprintKey: sprint.key,
+          projectName: project.name,
+          action: 'A new sprint has been created.',
+          projectUrl: this.buildProjectUrl(project._id.toString()),
+        },
       },
     );
 
@@ -187,6 +204,9 @@ export class SprintService {
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
     }
+
+    const wasStarted = sprint.isStarted;
+    const wasCompleted = sprint.isCompleted;
 
     const project = await getProjectWithAccess(this.projectModel, {
       projectId,
@@ -232,18 +252,49 @@ export class SprintService {
       throw new NotFoundException('Sprint not found');
     }
 
-    void this.notifyProjectMembersWithEmail(
-      project,
-      {
-        title: `Sprint ${sprint.key} Updated`,
-        message: `Sprint ${sprint.key} has been updated`,
-        projectId: project._id,
-      },
-      {
-        subject: `Sprint Updated`,
-        title: `Sprint ${sprint.key} Updated`,
-      },
-    );
+    if (!wasStarted && update.isStarted) {
+      void this.notifyProjectMembersWithEmail(
+        project,
+        {
+          title: `Sprint ${sprint.key} Started`,
+          message: `Sprint ${sprint.key} has been started`,
+          projectId: project._id,
+        },
+        {
+          template: 'sprint-update',
+          subject: 'Sprint Started',
+          data: {
+            sprintTitle: 'Sprint Started',
+            sprintKey: sprint.key,
+            projectName: project.name,
+            action: 'Sprint details have been started.',
+            projectUrl: this.buildProjectUrl(project._id.toString()),
+          },
+        },
+      );
+    }
+
+    if (!wasCompleted && update.isCompleted) {
+      void this.notifyProjectMembersWithEmail(
+        project,
+        {
+          title: `Sprint ${sprint.key} Completed`,
+          message: `Sprint ${sprint.key} has been completed`,
+          projectId: project._id,
+        },
+        {
+          template: 'sprint-update',
+          subject: 'Sprint Completed',
+          data: {
+            sprintTitle: 'Sprint Completed',
+            sprintKey: sprint.key,
+            projectName: project.name,
+            action: 'Sprint details have been completed.',
+            projectUrl: this.buildProjectUrl(project._id.toString()),
+          },
+        },
+      );
+    }
 
     return updatedSprint;
   }
@@ -277,8 +328,13 @@ export class SprintService {
         projectId: project._id,
       },
       {
-        subject: `Sprint Deleted`,
-        title: `Sprint ${sprint.key} Deleted`,
+        template: 'sprint-delete',
+        subject: 'Sprint Deleted',
+        data: {
+          sprintKey: sprint.key,
+          projectName: project.name,
+          projectUrl: this.buildProjectUrl(project._id.toString()),
+        },
       },
     );
 
@@ -328,9 +384,14 @@ export class SprintService {
         projectId: project._id,
       },
       {
-        subject: `Tasks Added to Sprint`,
-        title: `Tasks Added to ${updatedSprint.key}`,
-        highlightText: `${tasks.length} task(s) added`,
+        template: 'sprint-tasks',
+        subject: 'Tasks Added to Sprint',
+        data: {
+          sprintKey: updatedSprint.key,
+          projectName: project.name,
+          changeText: `${tasks.length} task(s) added to the sprint.`,
+          projectUrl: this.buildProjectUrl(project._id.toString()),
+        },
       },
     );
 
@@ -377,8 +438,14 @@ export class SprintService {
         projectId: project._id,
       },
       {
-        subject: `Task Removed from Sprint`,
-        title: `Task Removed from ${updatedSprint.key}`,
+        template: 'sprint-tasks',
+        subject: 'Task Removed from Sprint',
+        data: {
+          sprintKey: updatedSprint.key,
+          projectName: project.name,
+          changeText: `A task was removed from the sprint.`,
+          projectUrl: this.buildProjectUrl(project._id.toString()),
+        },
       },
     );
 

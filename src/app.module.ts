@@ -6,7 +6,7 @@ import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import appConfig from './config/app.config';
 import { ProjectModule } from './modules/project/project.module';
-import { MailSender } from './utils/mailSender';
+import { MailSender } from './mail/mailSender';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { SprintModule } from './modules/sprint/sprint.module';
 import { CommentModule } from './modules/comment/comment.module';

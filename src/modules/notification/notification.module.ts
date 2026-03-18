@@ -18,6 +18,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthModule } from '../auth/auth.module';
 import { NotificationPushService } from './services/notification-push.service';
 import { WebPushService } from './services/web-push.service';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { WebPushService } from './services/web-push.service';
     ]),
     JwtModule.register({}),
     AuthModule,
+    MailModule,
   ],
   controllers: [NotificationController],
   providers: [

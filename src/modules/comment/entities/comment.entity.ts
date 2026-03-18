@@ -24,6 +24,9 @@ export class Comment extends Document {
   })
   message: string;
 
+  @Prop()
+  parsedText?: string;
+
   @Prop({
     type: String,
     default: null,

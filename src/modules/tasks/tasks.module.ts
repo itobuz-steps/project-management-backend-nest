@@ -12,6 +12,7 @@ import { ProjectService } from '../project/services/project.service';
 import { StorageModule } from 'src/storage/storage.module';
 import { User, UserSchema } from '../auth/schemas/user.schema';
 import { Worklog, WorklogSchema } from './entities/worklog.entity';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   controllers: [TasksController],
@@ -33,6 +34,7 @@ import { Worklog, WorklogSchema } from './entities/worklog.entity';
     NotificationModule,
     ActivityModule,
     StorageModule,
+    MailModule,
   ],
   exports: [MongooseModule],
 })

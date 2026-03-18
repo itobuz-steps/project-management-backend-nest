@@ -1,0 +1,55 @@
+<div
+  style='font-family: Arial, sans-serif; max-width:600px; margin:auto; background:#ffffff; border:1px solid #eee; border-radius:10px; padding:20px;'
+>
+
+  <h2 style='color:#d32f2f; margin-bottom:10px;'>
+    Task Overdue
+  </h2>
+
+  <p style='color:#555; font-size:14px;'>
+    The following task requires your immediate attention:
+  </p>
+
+  <div
+    style='margin-top:20px; padding:16px; border-radius:8px; background:#fdecea; border:1px solid #f5c6cb;'
+  >
+    <h3 style='margin:0 0 10px 0; color:#333;'>
+      <span style='color:#333; font-weight:600;'>
+        {{taskKey}}
+      </span>
+      —
+      {{taskTitle}}
+    </h3>
+
+    {{#if projectName}}
+      <p style='margin:5px 0; font-size:13px; color:#555;'>
+        Project:
+        <strong>{{projectName}}</strong>
+      </p>
+    {{/if}}
+
+    <p
+      style='margin-top:10px; font-size:14px; color:#aa4b4b; font-weight:bold;'
+    >
+      This task is overdue. Please take action as soon as possible.
+    </p>
+  </div>
+
+  {{#if taskUrl}}
+    <div style='margin-top:20px; text-align:center;'>
+      <a
+        href='{{taskUrl}}'
+        style='background:#bf6565; color:#fff; padding:10px 18px; border-radius:6px; text-decoration:none; font-size:14px;'
+      >
+        View Task
+      </a>
+    </div>
+  {{/if}}
+
+  <hr style='margin:20px 0; border:none; border-top:1px solid #eee;' />
+
+  <p style='font-size:12px; color:#999; text-align:center;'>
+    Staying on top of overdue tasks helps keep your project on track.
+  </p>
+
+</div>

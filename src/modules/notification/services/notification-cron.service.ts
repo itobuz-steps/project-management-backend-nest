@@ -2,12 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-
 import { Task } from '../../tasks/entities/task.entity';
 import { User } from '../../auth/schemas/user.schema';
 import { Project } from '../../project/schema/project.schema';
 import { NotificationPushService } from './notification-push.service';
-import { MailService } from '../../../utils/sendVerificationMail';
+import { MailService } from '../../../mail/mail.service';
 
 @Injectable()
 export class NotificationCronService {
@@ -66,8 +65,10 @@ export class NotificationCronService {
           if (assignee.notificationPreferences?.email && assignee.email) {
             await this.mailService.sendTaskOverdueMail(
               assignee.email,
+              task.key,
               task.title,
               project.name,
+              task._id.toString(),
             );
           }
         }
@@ -78,8 +79,10 @@ export class NotificationCronService {
           if (reporter.notificationPreferences?.email && reporter.email) {
             await this.mailService.sendTaskOverdueMail(
               reporter.email,
+              task.key,
               task.title,
               project.name,
+              task._id.toString(),
             );
           }
         }

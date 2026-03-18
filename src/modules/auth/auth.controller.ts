@@ -20,7 +20,7 @@ import { multerOptionsForSingleFile } from '../../config/multer.config';
 import { AuthService } from './auth.service';
 import { SignupDto } from './dto/signup.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { MailService } from '../../utils/sendVerificationMail';
+import { MailService } from '../../mail/mail.service';
 import { UserDocument } from './schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { TokenGeneratorService } from 'src/utils/tokenGenerator';

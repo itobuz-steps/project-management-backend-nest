@@ -12,6 +12,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { TasksModule } from '../tasks/tasks.module';
 import { StorageModule } from 'src/storage/storage.module';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { StorageModule } from 'src/storage/storage.module';
     AuthModule,
     TasksModule,
     StorageModule,
+    MailModule,
   ],
   controllers: [ProjectController, InviteUserController],
   providers: [

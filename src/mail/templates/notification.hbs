@@ -1,0 +1,19 @@
+<div style='font-family: Arial; max-width:600px; margin:auto;'>
+  <h2>{{title}}</h2>
+
+  {{#if projectName}}
+    <p>Project: <strong>{{projectName}}</strong></p>
+  {{/if}}
+
+  <div style='padding:12px; border-left:4px solid #1a73e8;'>
+    <h3>{{message}}</h3>
+  </div>
+
+  {{#if highlightText}}
+    <blockquote style='background:#fff8e1; padding:10px;'>
+      "{{highlightText}}"
+    </blockquote>
+  {{/if}}
+
+  <p>Login to view more details.</p>
+</div>

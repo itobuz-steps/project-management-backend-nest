@@ -11,7 +11,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import type { Model } from 'mongoose';
 import type { AppConfig } from 'src/config/app.config';
-import { MailService } from 'src/utils/sendVerificationMail';
+import { MailService } from 'src/mail/mail.service';
 import type { UserDocument } from '../../auth/schemas/user.schema';
 import { User } from '../../auth/schemas/user.schema';
 import { InviteUserDto } from './../dto/invite-user.dto';

@@ -5,10 +5,10 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { User, UserSchema } from './schemas/user.schema';
 import { Otp, OtpSchema } from './schemas/otp.schema';
-import { MailService } from '../../utils/sendVerificationMail';
 import { TokenGeneratorService } from '../../utils/tokenGenerator';
 import { IsAuthenticated } from '../../middlewares/isAuthenticated';
 import { StorageModule } from 'src/storage/storage.module';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -18,9 +18,10 @@ import { StorageModule } from 'src/storage/storage.module';
     ]),
     JwtModule.register({}),
     StorageModule,
+    MailModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, MailService, TokenGeneratorService, IsAuthenticated],
-  exports: [AuthService, IsAuthenticated, MailService],
+  providers: [AuthService, TokenGeneratorService, IsAuthenticated],
+  exports: [AuthService, IsAuthenticated],
 })
 export class AuthModule {}

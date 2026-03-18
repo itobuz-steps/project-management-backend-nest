@@ -11,6 +11,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { ActivityModule } from '../activity/activity.module';
 import { StorageModule } from 'src/storage/storage.module';
 import { User, UserSchema } from '../auth/schemas/user.schema';
+import { MailModule } from 'src/mail/mail.module';
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
     NotificationModule,
     ActivityModule,
     StorageModule,
+    MailModule,
   ],
   controllers: [CommentController],
   providers: [CommentService],

@@ -16,7 +16,7 @@ import { ActivityService } from '../activity/services/activity.service';
 import { Role } from '../auth/types/auth.types';
 import { StorageService } from 'src/storage/storage.service';
 import { User } from '../auth/schemas/user.schema';
-import { MailService } from 'src/utils/sendVerificationMail';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class CommentService {

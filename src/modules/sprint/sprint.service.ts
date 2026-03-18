@@ -23,7 +23,7 @@ import {
   ProjectEmailPayload,
 } from './type/sprint.types';
 import { ProjectType } from '../project/type/project.types';
-import { MailService } from 'src/utils/sendVerificationMail';
+import { MailService } from 'src/mail/mail.service';
 import { User } from '../auth/schemas/user.schema';
 import { ActivityService } from '../activity/services/activity.service';
 

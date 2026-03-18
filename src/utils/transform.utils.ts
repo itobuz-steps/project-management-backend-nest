@@ -22,7 +22,6 @@ export function transformToArray({ value }: TransformFnParams): string[] {
       return [];
     }
   }
-
   return [];
 }
 

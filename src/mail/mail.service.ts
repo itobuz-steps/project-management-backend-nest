@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MailSender } from './mailSender';
 import { TemplateService } from './template.service';
-import { NotificationEmailTemplate } from './mail.types';
 import { AppConfig } from 'src/config/app.config';
 import { ConfigService } from '@nestjs/config';
 
@@ -83,7 +82,7 @@ export class MailService {
 
       await this.mailSender.sendMail(
         email,
-        `⚠ Task Overdue - ${taskTitle}`,
+        `Task Overdue - ${taskTitle}`,
         html,
       );
 
@@ -91,22 +90,6 @@ export class MailService {
     } catch (error) {
       this.logger.error(`Failed to send overdue email`, error);
       throw error;
-    }
-  }
-
-  async sendNotificationMail(
-    email: string,
-    subject: string,
-    payload: NotificationEmailTemplate,
-  ): Promise<void> {
-    try {
-      const html = TemplateService.compile('notification', payload);
-
-      await this.mailSender.sendMail(email, subject, html);
-
-      this.logger.log(`Notification email sent to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send notification email`, error);
     }
   }
 

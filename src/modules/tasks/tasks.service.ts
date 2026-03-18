@@ -873,7 +873,7 @@ export class TasksService {
             projectId: task.projectId,
           },
           {
-            template: 'task-deleted',
+            template: 'task-delete',
             subject: 'Task Deleted',
             data: {
               taskTitle: task.title,

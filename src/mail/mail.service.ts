@@ -32,7 +32,7 @@ export class MailService {
         otp: otpValue,
       });
 
-      await this.mailSender.sendMail(email, 'Verification Email', html);
+      await this.mailSender.sendMail(email, 'Your Verification Code', html);
 
       this.logger.log(`Verification email sent to ${email}`);
     } catch (error) {

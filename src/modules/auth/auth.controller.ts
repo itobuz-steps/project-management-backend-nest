@@ -119,6 +119,19 @@ export class AuthController {
         throw new BadRequestException('User is not verified');
       }
 
+      console.log(
+        'token',
+        this.tokenGeneratorService.generateToken(
+          user._id.toString(), // Convert ObjectId to string
+          user.email,
+          this.configService.get<string>('JWT_ACCESS_KEY') ??
+            'secret access key',
+          this.configService.get<AppConfig['JWT_ACCESS_EXPIRATION']>(
+            'JWT_ACCESS_EXPIRATION',
+          ),
+        ),
+      );
+
       return {
         success: true,
         message: 'Login successful',

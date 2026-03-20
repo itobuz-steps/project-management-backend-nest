@@ -507,8 +507,6 @@ export class SprintService {
   async getSprintCompletionSummary(sprintId: string, projectId: string) {
     const sprint = await this.sprintModel.findById(sprintId);
 
-    console.log('sprint', sprint);
-
     if (!sprint) {
       throw new NotFoundException('Sprint not found');
     }

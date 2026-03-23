@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Sprint } from './schema/sprint.schema';
 import { Task } from '../tasks/entities/task.entity';
 import { Activity } from '../activity/schemas/activity.schemas';
@@ -27,6 +27,8 @@ import { User } from '../auth/schemas/user.schema';
 import { ActivityService } from '../activity/services/activity.service';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from 'src/config/app.config';
+import { format, eachDayOfInterval, isWeekend } from 'date-fns';
+import { DayPoint, ScopeChange, AggResult } from './type/chartTypes';
 
 @Injectable()
 export class SprintService {
@@ -541,5 +543,137 @@ export class SprintService {
       }
     }
     return { completed, pending };
+  }
+
+  async getBurndown(sprintId: string) {
+    const sprint = await this.sprintModel.findById(sprintId).lean();
+
+    if (!sprint) {
+      throw new NotFoundException(`Sprint ${sprintId} not found`);
+    }
+
+    if (!sprint.startDate) {
+      throw new NotFoundException(`Sprint ${sprintId} has not started`);
+    }
+
+    const startDate = new Date(sprint.startDate);
+    const endDate = sprint.dueDate ? new Date(sprint.dueDate) : new Date();
+
+    const workingDays = eachDayOfInterval({ start: startDate, end: endDate })
+      .filter((d) => !isWeekend(d))
+      .map((d) => format(d, 'dd-MM-yyyy'));
+
+    const totalDays = workingDays.length;
+    const initialScope = sprint.storyPoint;
+
+    const doneTaskIds = Object.entries(sprint.taskStatusesAtCompletion)
+      .filter(([, status]) => status === 'done')
+      .map(([id]) => new Types.ObjectId(id));
+
+    const completionAgg = await this.taskModel.aggregate<AggResult>([
+      { $match: { _id: { $in: doneTaskIds } } },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%d-%m-%Y', date: '$updatedAt' } },
+          points: { $sum: '$storyPoint' },
+        },
+      },
+    ]);
+
+    const scopeAgg = await this.taskModel.aggregate<AggResult>([
+      {
+        $match: { _id: { $in: sprint.tasks }, createdAt: { $gt: startDate } },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%d-%m-%Y', date: '$createdAt' } },
+          points: { $sum: '$storyPoint' },
+        },
+      },
+    ]);
+
+    const completedByDay: Record<string, number> = Object.fromEntries(
+      completionAgg.map((r) => [r._id, r.points]),
+    );
+
+    const scopeByDay: Record<string, number> = Object.fromEntries(
+      scopeAgg.map((r) => [r._id, r.points]),
+    );
+
+    const currentScope =
+      initialScope + scopeAgg.reduce((sum, r) => sum + r.points, 0);
+
+    let actualRemaining = initialScope;
+
+    const series: DayPoint[] = [];
+    const scopeChanges: ScopeChange[] = [];
+
+    for (let d = 0; d < totalDays; d++) {
+      const date = workingDays[d];
+      const ideal = Math.max(
+        0,
+        Math.round(currentScope * (1 - d / (totalDays - 1))),
+      );
+      const scopeAdded = scopeByDay[date] ?? 0;
+      const completed = completedByDay[date] ?? 0;
+
+      actualRemaining = Math.max(0, actualRemaining + scopeAdded - completed);
+
+      series.push({
+        date,
+        ideal,
+        actual: actualRemaining,
+        completed,
+        scopeAdded,
+      });
+
+      if (scopeAdded > 0) {
+        scopeChanges.push({
+          date,
+          pointsAdded: scopeAdded,
+          actual: actualRemaining,
+        });
+      }
+    }
+
+    const todayKey = format(new Date(), 'dd-MM-yyyy');
+
+    const todayEntry =
+      series.find((s) => s.date === todayKey) ?? series[series.length - 1];
+
+    const completedTotal = completionAgg.reduce((sum, r) => sum + r.points, 0);
+
+    const variance = todayEntry.actual - todayEntry.ideal;
+
+    const variancePct =
+      currentScope > 0 ? Math.round((variance / currentScope) * 100) : 0;
+
+    const status =
+      variancePct <= 15 ? 'on_track' : variancePct <= 30 ? 'at_risk' : 'behind';
+
+    return {
+      sprint: {
+        id: sprintId,
+        key: sprint.key,
+        startDate: format(startDate, 'dd-MM-yyyy'),
+        endDate: format(endDate, 'dd-MM-yyyy'),
+        totalWorkingDays: totalDays,
+      },
+      summary: {
+        initialScope,
+        currentScope,
+        completedPoints: completedTotal,
+        remainingPoints: actualRemaining,
+        percentComplete:
+          currentScope > 0
+            ? Math.round((completedTotal / currentScope) * 100)
+            : 0,
+        status,
+        variance,
+        variancePct,
+      },
+      series,
+      scopeChanges,
+    };
   }
 }

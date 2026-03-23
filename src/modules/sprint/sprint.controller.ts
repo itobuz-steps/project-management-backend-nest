@@ -186,4 +186,13 @@ export class SprintController {
       result: tasks,
     };
   }
+
+  @Get('/:sprintId/burndown')
+  async getBurnDownChartData(
+    @Req() req: AuthenticatedRequest,
+    @Param('sprintId') sprintId: string,
+  ) {
+    const res = await this.sprintService.getBurndown(sprintId);
+    return { success: true, result: res };
+  }
 }

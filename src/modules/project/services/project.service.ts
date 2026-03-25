@@ -135,15 +135,18 @@ export class ProjectService {
     update: UpdateProjectDto,
     file?: Express.Multer.File,
   ): Promise<Project> {
-    const project = await this.projectModel.findOne({
-      _id: projectId,
-      members: {
-        $elemMatch: {
-          user: userId,
-          role: 'admin',
-        },
-      },
-    });
+    const project =
+      role === Role.SUPERADMIN
+        ? await this.projectModel.findById(projectId)
+        : await this.projectModel.findOne({
+            _id: projectId,
+            members: {
+              $elemMatch: {
+                user: userId,
+                role: 'admin',
+              },
+            },
+          });
 
     if (!project) {
       throw new ForbiddenException('Not allowed to update this project');

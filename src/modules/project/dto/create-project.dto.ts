@@ -46,11 +46,5 @@ export class CreateProjectDto {
   members?: ProjectMemberDto[];
 
   @IsMongoId()
-  memberLead?: string;
-
-  @IsString()
-  theme?: string;
-
-  @IsMongoId()
   workspaceId?: string;
 }

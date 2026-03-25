@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { Sprint } from './schema/sprint.schema';
 import { Task } from '../tasks/entities/task.entity';
 import { Activity } from '../activity/schemas/activity.schemas';
@@ -135,7 +135,7 @@ export class SprintService {
     }
 
     return await this.sprintModel
-      .find({ projectId })
+      .find({ projectId: new mongoose.Types.ObjectId(projectId) })
       .sort({ startDate: 1, createdAt: 1 });
   }
 

@@ -18,6 +18,8 @@ import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { StorageService } from 'src/storage/storage.service';
 import { ActivityService } from 'src/modules/activity/services/activity.service';
+import { ActivityAction } from 'src/modules/activity/type/activity.types';
+import { Activity } from 'src/modules/activity/schemas/activity.schemas';
 
 @Injectable()
 export class ProjectService {
@@ -187,6 +189,68 @@ export class ProjectService {
       }
     }
 
+    const memberLogs: Promise<Activity>[] = [];
+
+    if (updatePayload.members) {
+      const oldMembers = project.members as {
+        user: Types.ObjectId;
+        role: string;
+      }[];
+      const newMembers = updatePayload.members as {
+        user: string;
+        role: string;
+      }[];
+
+      const oldMap = new Map(
+        oldMembers.map((m) => [m.user.toString(), m.role]),
+      );
+      const newMap = new Map(
+        newMembers.map((m) => [m.user.toString(), m.role]),
+      );
+
+      const added = newMembers.filter((m) => !oldMap.has(m.user));
+      const removed = oldMembers.filter((m) => !newMap.has(m.user.toString()));
+
+      const roleChanged = newMembers.filter((m) => {
+        const oldRole = oldMap.get(m.user.toString());
+        return oldRole && oldRole !== m.role;
+      });
+
+      for (const m of added) {
+        memberLogs.push(
+          this.activityService.logMemberChange(
+            projectId.toString(),
+            userId.toString(),
+            ActivityAction.MEMBER_ADDED,
+            m.user,
+            m.role,
+          ),
+        );
+      }
+      for (const m of removed) {
+        memberLogs.push(
+          this.activityService.logMemberChange(
+            projectId.toString(),
+            userId.toString(),
+            ActivityAction.MEMBER_REMOVED,
+            m.user.toString(),
+            m.role,
+          ),
+        );
+      }
+      for (const m of roleChanged) {
+        memberLogs.push(
+          this.activityService.logMemberRoleChanged(
+            projectId.toString(),
+            userId.toString(),
+            m.user.toString(),
+            oldMap.get(m.user)!,
+            m.role,
+          ),
+        );
+      }
+    }
+
     if (file) {
       const uploadRes = await this.storageService.uploadSingleFile(file);
 
@@ -225,11 +289,16 @@ export class ProjectService {
       );
     }
 
-    await this.activityService.logUpdateProject(
-      projectId.toString(),
-      userId.toString(),
-      updatedColumns,
-    );
+    await Promise.all([
+      Object.keys(updatedColumns).length > 0
+        ? this.activityService.logUpdateProject(
+            projectId.toString(),
+            userId.toString(),
+            updatedColumns,
+          )
+        : null,
+    ]).catch((err) => console.error('Activity log error:', err));
+
     await this.notificationPushService.pushNotificationToProjectMembers(
       projectId,
       {

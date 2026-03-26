@@ -307,4 +307,27 @@ export class ActivityService {
       },
     });
   }
+
+  async getProjectActivities(projectId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+
+    const [activities, total] = await Promise.all([
+      this.activityModel
+        .find({ project: new Types.ObjectId(projectId) })
+        .populate('byUser', 'name profileImage')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      this.activityModel.countDocuments({
+        project: new Types.ObjectId(projectId),
+      }),
+    ]);
+
+    return {
+      activities,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
 }

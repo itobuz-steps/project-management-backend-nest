@@ -490,6 +490,7 @@ export class SprintService {
 
     const finalRemovedTaskIds = removedTaskIds.filter(
       (taskId) =>
+        taskId &&
         !sprint.tasks.some(
           (task) => task.toString() === taskId._id?.toString(),
         ),
@@ -500,7 +501,11 @@ export class SprintService {
     }
 
     return this.taskModel.find({
-      _id: { $in: finalRemovedTaskIds.map((task) => task._id) },
+      _id: {
+        $in: finalRemovedTaskIds
+          .map((t) => t?._id)
+          .filter(Boolean) as Types.ObjectId[],
+      },
     });
   }
 

@@ -17,6 +17,7 @@ import { Task } from '../../tasks/entities/task.entity';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { StorageService } from 'src/storage/storage.service';
+import { ActivityService } from 'src/modules/activity/services/activity.service';
 
 @Injectable()
 export class ProjectService {
@@ -32,6 +33,7 @@ export class ProjectService {
 
     private readonly notificationPushService: NotificationPushService,
     private readonly storageService: StorageService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async getAllProjects(userId: ObjectIdLike, role: Role): Promise<Project[]> {
@@ -119,6 +121,12 @@ export class ProjectService {
 
     const savedProject = await project.save();
 
+    await this.activityService.logProjectCreated(
+      savedProject._id.toString(),
+      userId.toString(),
+      savedProject.name,
+    );
+
     await this.notificationPushService.pushNotificationToUser(userId, {
       title: `Project "${savedProject.name}" Created`,
       message: `Project "${savedProject.name}" was created`,
@@ -155,6 +163,29 @@ export class ProjectService {
     const previousDefaultAssignee = project.defaultAssignee?.toString() || null;
 
     const updatePayload = { ...update };
+
+    const updatedColumns: Record<string, { from: string; to: string }> = {};
+
+    for (const key of Object.keys(updatePayload)) {
+      const oldVal = project[key as keyof typeof project];
+      const newVal = updatePayload[key as keyof typeof updatePayload];
+
+      const serialize = (value: unknown): string => {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        if (typeof value === 'string') return value;
+        if (typeof value === 'number' || typeof value === 'boolean')
+          return String(value);
+        return '';
+      }; // type coversion needed fix
+
+      const oldValue = serialize(oldVal);
+      const newValue = serialize(newVal);
+
+      if (oldValue !== newValue) {
+        updatedColumns[key] = { from: oldValue, to: newValue };
+      }
+    }
 
     if (file) {
       const uploadRes = await this.storageService.uploadSingleFile(file);
@@ -194,6 +225,11 @@ export class ProjectService {
       );
     }
 
+    await this.activityService.logUpdateProject(
+      projectId.toString(),
+      userId.toString(),
+      updatedColumns,
+    );
     await this.notificationPushService.pushNotificationToProjectMembers(
       projectId,
       {
@@ -222,6 +258,11 @@ export class ProjectService {
     if (!project) {
       throw new NotFoundException('Project by given id not found');
     }
+
+    await this.activityService.logProjectDelete(
+      projectId.toString(),
+      userId.toString(),
+    );
 
     await this.notificationPushService.pushNotificationToProjectMembers(
       project._id,
@@ -271,6 +312,12 @@ export class ProjectService {
     project.columns = project.columns.filter((col) => col !== columnName);
 
     await project.save();
+
+    await this.activityService.logDeleteProjectColumn(
+      projectId.toString(),
+      userId.toString(),
+      columnName,
+    );
 
     return project;
   }

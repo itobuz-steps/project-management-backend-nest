@@ -195,4 +195,79 @@ export class ActivityService {
       updatedFields,
     });
   }
+
+  async logProjectCreated(
+    projectId: string,
+    byUserId: string,
+    projectName: string,
+  ) {
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      projectName: projectName,
+      action: ActivityAction.PROJECT_CREATED,
+      byUser: new Types.ObjectId(byUserId),
+    });
+  }
+
+  async logProjectDelete(projectId: string, byUserId: string) {
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      action: ActivityAction.PROJECT_DELETED,
+      byUser: new Types.ObjectId(byUserId),
+    });
+  }
+
+  async logDeleteProjectColumn(
+    projectId: string,
+    byUserId: string,
+    columnName: string,
+  ) {
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      byUser: new Types.ObjectId(byUserId),
+      action: ActivityAction.COLUMN_DELETED,
+      updatedFields: {
+        column: { from: columnName, to: '' },
+      },
+    });
+  }
+
+  private async resolveUserValue(value: string): Promise<string> {
+    if (!value) return '';
+
+    // check if it's a valid ObjectId
+    if (!Types.ObjectId.isValid(value)) return value;
+
+    const user = await this.userModel.findById(value).select('name');
+    return user?.name || value;
+  }
+
+  async logUpdateProject(
+    projectId: string,
+    byUserId: string,
+    updates: Record<string, { from: string; to: string }>,
+  ) {
+    const userFields = ['defaultAssignee', 'members']; //problem in extracting members name
+
+    const transformedUpdates: Record<string, { from: string; to: string }> = {};
+
+    for (const key of Object.keys(updates)) {
+      let from = updates[key].from;
+      let to = updates[key].to;
+
+      if (userFields.includes(key)) {
+        from = await this.resolveUserValue(from);
+        to = await this.resolveUserValue(to);
+      }
+
+      transformedUpdates[key] = { from, to };
+    }
+
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      byUser: new Types.ObjectId(byUserId),
+      action: ActivityAction.PROJECT_UPDATED,
+      updatedFields: transformedUpdates,
+    });
+  }
 }

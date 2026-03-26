@@ -17,6 +17,9 @@ import { Task } from '../../tasks/entities/task.entity';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 import { StorageService } from 'src/storage/storage.service';
+import { ActivityService } from 'src/modules/activity/services/activity.service';
+import { ActivityAction } from 'src/modules/activity/type/activity.types';
+import { Activity } from 'src/modules/activity/schemas/activity.schemas';
 
 @Injectable()
 export class ProjectService {
@@ -32,6 +35,7 @@ export class ProjectService {
 
     private readonly notificationPushService: NotificationPushService,
     private readonly storageService: StorageService,
+    private readonly activityService: ActivityService,
   ) {}
 
   async getAllProjects(userId: ObjectIdLike, role: Role): Promise<Project[]> {
@@ -119,6 +123,12 @@ export class ProjectService {
 
     const savedProject = await project.save();
 
+    await this.activityService.logProjectCreated(
+      savedProject._id.toString(),
+      userId.toString(),
+      savedProject.name,
+    );
+
     await this.notificationPushService.pushNotificationToUser(userId, {
       title: `Project "${savedProject.name}" Created`,
       message: `Project "${savedProject.name}" was created`,
@@ -155,6 +165,91 @@ export class ProjectService {
     const previousDefaultAssignee = project.defaultAssignee?.toString() || null;
 
     const updatePayload = { ...update };
+
+    const updatedColumns: Record<string, { from: string; to: string }> = {};
+
+    for (const key of Object.keys(updatePayload)) {
+      const oldVal = project[key as keyof typeof project];
+      const newVal = updatePayload[key as keyof typeof updatePayload];
+
+      const serialize = (value: unknown): string => {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        if (typeof value === 'string') return value;
+        if (typeof value === 'number' || typeof value === 'boolean')
+          return String(value);
+        return '';
+      }; // type coversion needed fix
+
+      const oldValue = serialize(oldVal);
+      const newValue = serialize(newVal);
+
+      if (oldValue !== newValue) {
+        updatedColumns[key] = { from: oldValue, to: newValue };
+      }
+    }
+
+    const memberLogs: Promise<Activity>[] = [];
+
+    if (updatePayload.members) {
+      const oldMembers = project.members as {
+        user: Types.ObjectId;
+        role: string;
+      }[];
+      const newMembers = updatePayload.members as {
+        user: string;
+        role: string;
+      }[];
+
+      const oldMap = new Map(
+        oldMembers.map((m) => [m.user.toString(), m.role]),
+      );
+      const newMap = new Map(
+        newMembers.map((m) => [m.user.toString(), m.role]),
+      );
+
+      const added = newMembers.filter((m) => !oldMap.has(m.user));
+      const removed = oldMembers.filter((m) => !newMap.has(m.user.toString()));
+
+      const roleChanged = newMembers.filter((m) => {
+        const oldRole = oldMap.get(m.user.toString());
+        return oldRole && oldRole !== m.role;
+      });
+
+      for (const m of added) {
+        memberLogs.push(
+          this.activityService.logMemberChange(
+            projectId.toString(),
+            userId.toString(),
+            ActivityAction.MEMBER_ADDED,
+            m.user,
+            m.role,
+          ),
+        );
+      }
+      for (const m of removed) {
+        memberLogs.push(
+          this.activityService.logMemberChange(
+            projectId.toString(),
+            userId.toString(),
+            ActivityAction.MEMBER_REMOVED,
+            m.user.toString(),
+            m.role,
+          ),
+        );
+      }
+      for (const m of roleChanged) {
+        memberLogs.push(
+          this.activityService.logMemberRoleChanged(
+            projectId.toString(),
+            userId.toString(),
+            m.user.toString(),
+            oldMap.get(m.user)!,
+            m.role,
+          ),
+        );
+      }
+    }
 
     if (file) {
       const uploadRes = await this.storageService.uploadSingleFile(file);
@@ -194,6 +289,16 @@ export class ProjectService {
       );
     }
 
+    await Promise.all([
+      Object.keys(updatedColumns).length > 0
+        ? this.activityService.logUpdateProject(
+            projectId.toString(),
+            userId.toString(),
+            updatedColumns,
+          )
+        : null,
+    ]).catch((err) => console.error('Activity log error:', err));
+
     await this.notificationPushService.pushNotificationToProjectMembers(
       projectId,
       {
@@ -222,6 +327,11 @@ export class ProjectService {
     if (!project) {
       throw new NotFoundException('Project by given id not found');
     }
+
+    await this.activityService.logProjectDelete(
+      projectId.toString(),
+      userId.toString(),
+    );
 
     await this.notificationPushService.pushNotificationToProjectMembers(
       project._id,
@@ -271,6 +381,12 @@ export class ProjectService {
     project.columns = project.columns.filter((col) => col !== columnName);
 
     await project.save();
+
+    await this.activityService.logDeleteProjectColumn(
+      projectId.toString(),
+      userId.toString(),
+      columnName,
+    );
 
     return project;
   }

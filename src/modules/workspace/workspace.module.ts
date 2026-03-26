@@ -5,11 +5,11 @@ import { Workspace, WorkspaceSchema } from './entities/workspace.entity';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import { JwtModule } from '@nestjs/jwt';
-import { ProjectService } from '../project/services/project.service';
 import { Project, ProjectSchema } from '../project/schema/project.schema';
 import { NotificationModule } from '../notification/notification.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { StorageModule } from '../../storage/storage.module';
+import { ProjectModule } from '../project/project.module';
 
 @Module({
   imports: [
@@ -22,8 +22,9 @@ import { StorageModule } from '../../storage/storage.module';
     NotificationModule,
     TasksModule,
     StorageModule,
+    ProjectModule,
   ],
   controllers: [WorkspaceController],
-  providers: [WorkspaceService, ProjectService],
+  providers: [WorkspaceService],
 })
 export class WorkspaceModule {}

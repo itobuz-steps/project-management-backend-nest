@@ -195,4 +195,116 @@ export class ActivityService {
       updatedFields,
     });
   }
+
+  async logProjectCreated(
+    projectId: string,
+    byUserId: string,
+    projectName: string,
+  ) {
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      projectName: projectName,
+      action: ActivityAction.PROJECT_CREATED,
+      byUser: new Types.ObjectId(byUserId),
+    });
+  }
+
+  async logProjectDelete(projectId: string, byUserId: string) {
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      action: ActivityAction.PROJECT_DELETED,
+      byUser: new Types.ObjectId(byUserId),
+    });
+  }
+
+  async logDeleteProjectColumn(
+    projectId: string,
+    byUserId: string,
+    columnName: string,
+  ) {
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      byUser: new Types.ObjectId(byUserId),
+      action: ActivityAction.COLUMN_DELETED,
+      updatedFields: {
+        column: { from: columnName, to: '' },
+      },
+    });
+  }
+
+  private async resolveFieldValue(key: string, value: string): Promise<string> {
+    if (!value) return '';
+
+    if (key === 'defaultAssignee') {
+      if (!Types.ObjectId.isValid(value)) return value;
+      const user = await this.userModel.findById(value).select('name');
+      return user?.name || value;
+    }
+
+    return value;
+  }
+
+  async logUpdateProject(
+    projectId: string,
+    byUserId: string,
+    updates: Record<string, { from: string; to: string }>,
+  ) {
+    const transformedUpdates: Record<string, { from: string; to: string }> = {};
+
+    for (const key of Object.keys(updates)) {
+      transformedUpdates[key] = {
+        from: await this.resolveFieldValue(key, updates[key].from),
+        to: await this.resolveFieldValue(key, updates[key].to),
+      };
+    }
+
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      byUser: new Types.ObjectId(byUserId),
+      action: ActivityAction.PROJECT_UPDATED,
+      updatedFields: transformedUpdates,
+    });
+  }
+
+  async logMemberChange(
+    projectId: string,
+    byUserId: string,
+    action: ActivityAction,
+    memberId: string,
+    role: string,
+  ) {
+    const user = await this.userModel.findById(memberId).select('name');
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      byUser: new Types.ObjectId(byUserId),
+      action,
+      updatedFields: {
+        member: {
+          from: user?.name ?? memberId,
+          to: role,
+        },
+      },
+    });
+  }
+
+  async logMemberRoleChanged(
+    projectId: string,
+    byUserId: string,
+    memberId: string,
+    fromRole: string,
+    toRole: string,
+  ) {
+    const user = await this.userModel.findById(memberId).select('name');
+    return this.activityModel.create({
+      project: new Types.ObjectId(projectId),
+      byUser: new Types.ObjectId(byUserId),
+      action: ActivityAction.ROLE_CHANGED,
+      updatedFields: {
+        member: {
+          from: `${user?.name ?? memberId} (${fromRole})`,
+          to: `${user?.name ?? memberId} (${toRole})`,
+        },
+      },
+    });
+  }
 }

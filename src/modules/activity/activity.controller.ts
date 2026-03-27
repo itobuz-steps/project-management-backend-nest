@@ -35,4 +35,17 @@ export class ActivityController {
     }
     return this.activityService.getTaskTimeline(taskId, +page, +limit);
   }
+
+  @Get(':projectId/activities')
+  async getProjectActivities(
+    @Param('projectId') projectId: string,
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+  ) {
+    return await this.activityService.getProjectActivities(
+      projectId,
+      +page,
+      +limit,
+    );
+  }
 }

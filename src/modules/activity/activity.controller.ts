@@ -36,7 +36,7 @@ export class ActivityController {
     return this.activityService.getTaskTimeline(taskId, +page, +limit);
   }
 
-  @Get(':projectId/activities')
+  @Get('projects/:projectId/activities')
   async getProjectActivities(
     @Param('projectId') projectId: string,
     @Query('page') page = 1,

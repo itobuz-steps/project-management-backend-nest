@@ -271,7 +271,6 @@ export class ActivityService {
     byUserId: string,
     action: ActivityAction,
     memberId: string,
-    role: string,
   ) {
     const user = await this.userModel.findById(memberId).select('name');
     return this.activityModel.create({
@@ -280,8 +279,8 @@ export class ActivityService {
       action,
       updatedFields: {
         member: {
-          from: user?.name ?? memberId,
-          to: role,
+          from: '',
+          to: user?.name,
         },
       },
     });

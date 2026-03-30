@@ -169,6 +169,8 @@ export class ProjectService {
     const updatedColumns: Record<string, { from: string; to: string }> = {};
 
     for (const key of Object.keys(updatePayload)) {
+      if (key === 'members') continue;
+
       const oldVal = project[key as keyof typeof project];
       const newVal = updatePayload[key as keyof typeof updatePayload];
 
@@ -179,7 +181,7 @@ export class ProjectService {
         if (typeof value === 'number' || typeof value === 'boolean')
           return String(value);
         return '';
-      }; // type coversion needed fix
+      };
 
       const oldValue = serialize(oldVal);
       const newValue = serialize(newVal);
@@ -223,7 +225,6 @@ export class ProjectService {
             userId.toString(),
             ActivityAction.MEMBER_ADDED,
             m.user,
-            m.role,
           ),
         );
       }
@@ -234,7 +235,6 @@ export class ProjectService {
             userId.toString(),
             ActivityAction.MEMBER_REMOVED,
             m.user.toString(),
-            m.role,
           ),
         );
       }
@@ -290,7 +290,7 @@ export class ProjectService {
     }
 
     await Promise.all([
-      Object.keys(updatedColumns).length > 0
+      Object.keys(updatedColumns).length
         ? this.activityService.logUpdateProject(
             projectId.toString(),
             userId.toString(),

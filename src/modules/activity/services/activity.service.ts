@@ -330,7 +330,6 @@ export class ActivityService {
 
     const skip = (page - 1) * limit;
 
-    // 🔹 Base filter (type-safe)
     const filter: QueryFilter<Activity> = {
       project: new Types.ObjectId(projectId),
     };
@@ -339,7 +338,6 @@ export class ActivityService {
       filter.action = { $in: actions };
     }
 
-    // ✅ SAFE date filter (no mutation, no ESLint error)
     if (dateFrom || dateTo) {
       filter.createdAt = {
         ...(dateFrom ? { $gte: new Date(dateFrom) } : {}),
@@ -355,7 +353,6 @@ export class ActivityService {
       };
     }
 
-    // 🔹 Match conditions after lookup
     const matchConditions: QueryFilter<AggregatedActivity> = {};
 
     if (byUsers?.length) {
@@ -374,11 +371,10 @@ export class ActivityService {
       matchConditions.$or = [
         { 'byUser.name': regex },
         { projectName: regex },
-        { action: regex }, // optional if enum strict
+        { action: regex },
       ];
     }
 
-    // 🔹 MAIN PIPELINE
     const pipeline: PipelineStage[] = [
       { $match: filter },
       {
@@ -418,7 +414,6 @@ export class ActivityService {
       },
     );
 
-    // 🔹 COUNT PIPELINE (separate, no mutation bug)
     const countPipeline: PipelineStage[] = [
       { $match: filter },
       {
@@ -438,7 +433,6 @@ export class ActivityService {
 
     countPipeline.push({ $count: 'total' });
 
-    // 🔹 EXECUTION
     const [activities, countResult] = await Promise.all([
       this.activityModel.aggregate<AggregatedActivity>(pipeline),
       this.activityModel.aggregate<CountResult>(countPipeline),
@@ -458,7 +452,6 @@ export class ActivityService {
     projectId: string,
     options: GetActivitiesDto,
   ): Promise<{ activities: AggregatedActivity[] }> {
-    // Reuse same filter/aggregation logic but no skip/limit
     const { search, byUsers, actions, dateFrom, dateTo } = options;
 
     const filter: ActivityFilter = {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, PipelineStage, QueryFilter } from 'mongoose';
 import { Activity } from '../schemas/activity.schemas';
 import { ActivityAction } from '../type/activity.types';
 import {
@@ -12,6 +12,13 @@ import {
   LogRemovedFromSprintParams,
 } from '../type/activity-params.types';
 import { User, UserDocument } from 'src/modules/auth/schemas/user.schema';
+import { GetActivitiesDto } from '../dto/get-activities.dto';
+import {
+  ActivityFilter,
+  AggregatedActivity,
+  CountResult,
+  PaginatedActivitiesResult,
+} from '../type/activity-filter.type';
 
 @Injectable()
 export class ActivityService {
@@ -307,20 +314,137 @@ export class ActivityService {
     });
   }
 
-  async getProjectActivities(projectId: string, page = 1, limit = 20) {
+  async getProjectActivities(
+    projectId: string,
+    options: GetActivitiesDto,
+  ): Promise<PaginatedActivitiesResult> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      byUsers,
+      actions,
+      dateFrom,
+      dateTo,
+    } = options;
+
     const skip = (page - 1) * limit;
 
-    const [activities, total] = await Promise.all([
-      this.activityModel
-        .find({ project: new Types.ObjectId(projectId) })
-        .populate('byUser', 'name profileImage')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      this.activityModel.countDocuments({
-        project: new Types.ObjectId(projectId),
-      }),
+    // 🔹 Base filter (type-safe)
+    const filter: QueryFilter<Activity> = {
+      project: new Types.ObjectId(projectId),
+    };
+
+    if (actions?.length) {
+      filter.action = { $in: actions };
+    }
+
+    // ✅ SAFE date filter (no mutation, no ESLint error)
+    if (dateFrom || dateTo) {
+      filter.createdAt = {
+        ...(dateFrom ? { $gte: new Date(dateFrom) } : {}),
+        ...(dateTo
+          ? {
+              $lte: (() => {
+                const end = new Date(dateTo);
+                end.setHours(23, 59, 59, 999);
+                return end;
+              })(),
+            }
+          : {}),
+      };
+    }
+
+    // 🔹 Match conditions after lookup
+    const matchConditions: QueryFilter<AggregatedActivity> = {};
+
+    if (byUsers?.length) {
+      const validUserIds = byUsers
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
+      if (validUserIds.length) {
+        matchConditions['byUser._id'] = { $in: validUserIds };
+      }
+    }
+
+    if (search?.trim()) {
+      const regex = new RegExp(search.trim(), 'i');
+
+      matchConditions.$or = [
+        { 'byUser.name': regex },
+        { projectName: regex },
+        { action: regex }, // optional if enum strict
+      ];
+    }
+
+    // 🔹 MAIN PIPELINE
+    const pipeline: PipelineStage[] = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'byUser',
+          foreignField: '_id',
+          as: 'byUser',
+        },
+      },
+      {
+        $unwind: {
+          path: '$byUser',
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+    ];
+
+    if (Object.keys(matchConditions).length) {
+      pipeline.push({ $match: matchConditions });
+    }
+
+    pipeline.push(
+      { $sort: { createdAt: -1 } },
+      { $skip: skip },
+      { $limit: limit },
+      {
+        $project: {
+          action: 1,
+          projectName: 1,
+          updatedFields: 1,
+          createdAt: 1,
+          'byUser._id': 1,
+          'byUser.name': 1,
+          'byUser.profileImage': 1,
+        },
+      },
+    );
+
+    // 🔹 COUNT PIPELINE (separate, no mutation bug)
+    const countPipeline: PipelineStage[] = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'byUser',
+          foreignField: '_id',
+          as: 'byUser',
+        },
+      },
+      { $unwind: '$byUser' },
+    ];
+
+    if (Object.keys(matchConditions).length) {
+      countPipeline.push({ $match: matchConditions });
+    }
+
+    countPipeline.push({ $count: 'total' });
+
+    // 🔹 EXECUTION
+    const [activities, countResult] = await Promise.all([
+      this.activityModel.aggregate<AggregatedActivity>(pipeline),
+      this.activityModel.aggregate<CountResult>(countPipeline),
     ]);
+
+    const total = countResult[0]?.total ?? 0;
 
     return {
       activities,
@@ -328,5 +452,113 @@ export class ActivityService {
       page,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async exportProjectActivities(
+    projectId: string,
+    options: GetActivitiesDto,
+  ): Promise<{ activities: AggregatedActivity[] }> {
+    // Reuse same filter/aggregation logic but no skip/limit
+    const { search, byUsers, actions, dateFrom, dateTo } = options;
+
+    const filter: ActivityFilter = {
+      project: new Types.ObjectId(projectId),
+    };
+
+    if (actions?.length) filter.action = { $in: actions };
+
+    if (dateFrom || dateTo) {
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) {
+        const end = new Date(dateTo);
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt.$lte = end;
+      }
+    }
+
+    if (search || byUsers?.length) {
+      const pipeline: PipelineStage[] = [
+        { $match: filter },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'byUser',
+            foreignField: '_id',
+            as: 'byUser',
+          },
+        },
+        { $unwind: '$byUser' },
+      ];
+
+      const andConditions: Record<string, unknown>[] = [];
+
+      if (byUsers?.length) {
+        andConditions.push({
+          'byUser._id': { $in: byUsers.map((id) => new Types.ObjectId(id)) },
+        });
+      }
+
+      if (search) {
+        const regex = new RegExp(search, 'i');
+        andConditions.push({
+          $or: [
+            { 'byUser.name': regex },
+            { projectName: regex },
+            { action: regex },
+          ],
+        });
+      }
+
+      if (andConditions.length)
+        pipeline.push({ $match: { $and: andConditions } });
+
+      pipeline.push(
+        { $sort: { createdAt: -1 } },
+        {
+          $project: {
+            action: 1,
+            projectName: 1,
+            updatedFields: 1,
+            createdAt: 1,
+            'byUser._id': 1,
+            'byUser.name': 1,
+            'byUser.profileImage': 1,
+          },
+        },
+      );
+
+      const activities =
+        await this.activityModel.aggregate<AggregatedActivity>(pipeline);
+      return { activities };
+    }
+
+    const docs = await this.activityModel
+      .find(filter)
+      .populate<{
+        byUser: { _id: Types.ObjectId; name: string; profileImage: string };
+      }>('byUser', 'name profileImage')
+      .sort({ createdAt: -1 });
+
+    const activities: AggregatedActivity[] = docs.map((doc) => {
+      const plain = doc.toObject() as unknown as Activity & {
+        byUser: { _id: Types.ObjectId; name: string; profileImage: string };
+        createdAt: Date;
+      };
+      return {
+        _id: plain._id,
+        action: plain.action!,
+        projectName: plain.projectName,
+        updatedFields: plain.updatedFields,
+        createdAt: plain.createdAt,
+        byUser: {
+          _id: plain.byUser._id,
+          name: plain.byUser.name,
+          profileImage: plain.byUser.profileImage,
+        },
+      } as AggregatedActivity;
+    });
+
+    return { activities };
   }
 }

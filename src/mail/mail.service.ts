@@ -13,14 +13,14 @@ export class MailService {
     private readonly configService: ConfigService<AppConfig>,
   ) {}
 
-  private buildTaskUrl(taskId: string) {
+  private buildTaskUrl(token: string) {
     const baseUrl = this.configService.get<string>('FRONTEND_URL');
 
     if (!baseUrl) {
       throw new Error('FRONTEND_URL is not defined');
     }
 
-    return `${baseUrl}/task/${taskId}`;
+    return `${baseUrl}/invite/join?token=${token}`;
   }
 
   async sendVerificationMail(

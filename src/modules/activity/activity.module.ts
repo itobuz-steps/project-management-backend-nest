@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { Activity, ActivitySchema } from './schemas/activity.schemas';
@@ -6,6 +6,7 @@ import { ActivityService } from './services/activity.service';
 import { ActivityController } from './activity.controller';
 import { AuthModule } from '../auth/auth.module';
 import { User, UserSchema } from '../auth/schemas/user.schema';
+import { ProjectModule } from '../project/project.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
     ]),
     JwtModule.register({}),
     AuthModule,
+    forwardRef(() => ProjectModule),
   ],
   controllers: [ActivityController],
   providers: [ActivityService],

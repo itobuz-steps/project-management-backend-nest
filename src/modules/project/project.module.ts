@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
@@ -27,7 +27,7 @@ import { ActivityModule } from '../activity/activity.module';
     TasksModule,
     StorageModule,
     MailModule,
-    ActivityModule,
+    forwardRef(() => ActivityModule),
   ],
   controllers: [ProjectController, InviteUserController],
   providers: [

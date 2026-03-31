@@ -2,6 +2,8 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ActivityService } from './services/activity.service';
 import { ActivityAction } from './type/activity.types';
 import { IsAuthenticated } from 'src/middlewares/isAuthenticated';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { ProjectRole } from 'src/modules/project/type/project.types';
 
 @Controller()
 @UseGuards(IsAuthenticated)
@@ -36,6 +38,7 @@ export class ActivityController {
     return this.activityService.getTaskTimeline(taskId, +page, +limit);
   }
 
+  @Roles(ProjectRole.ADMIN)
   @Get('projects/:projectId/activities')
   async getProjectActivities(
     @Param('projectId') projectId: string,

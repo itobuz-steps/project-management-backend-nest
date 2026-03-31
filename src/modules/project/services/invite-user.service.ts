@@ -88,7 +88,6 @@ export class InviteUserService {
   }
 
   async acceptUsersInvite(token: string | undefined, user?: UserDocument) {
-    console.log('accepted token route');
     if (!token) {
       throw new BadRequestException('No token provided');
     }
@@ -118,9 +117,6 @@ export class InviteUserService {
     }
 
     const { email: inviteEmail, projectId } = decodedInvite;
-
-    console.log('email', inviteEmail);
-    console.log('projectId', projectId);
 
     if (user.email !== inviteEmail) {
       throw new ForbiddenException(

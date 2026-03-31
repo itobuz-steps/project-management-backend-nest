@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Types, PipelineStage, QueryFilter } from 'mongoose';
 import { Activity } from '../schemas/activity.schemas';
 import { ActivityAction } from '../type/activity.types';
 import {
@@ -12,6 +12,26 @@ import {
   LogRemovedFromSprintParams,
 } from '../type/activity-params.types';
 import { User, UserDocument } from 'src/modules/auth/schemas/user.schema';
+import { GetActivitiesDto } from '../dto/get-activities.dto';
+import {
+  AggregatedActivity,
+  CountResult,
+  PaginatedActivitiesResult,
+} from '../type/activity-filter.type';
+
+interface BuildPipelineOptions {
+  projectId: string;
+  search?: string;
+  byUsers?: string[];
+  actions?: string[];
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+interface BuiltPipeline {
+  pipeline: PipelineStage[];
+  countPipeline: PipelineStage[];
+}
 
 @Injectable()
 export class ActivityService {
@@ -307,26 +327,160 @@ export class ActivityService {
     });
   }
 
-  async getProjectActivities(projectId: string, page = 1, limit = 20) {
+  private buildActivityPipeline(options: BuildPipelineOptions): BuiltPipeline {
+    const { projectId, search, byUsers, actions, dateFrom, dateTo } = options;
+
+    const filter: QueryFilter<Activity> = {
+      project: new Types.ObjectId(projectId),
+    };
+
+    if (actions?.length) {
+      filter.action = { $in: actions };
+    }
+
+    if (dateFrom || dateTo) {
+      filter.createdAt = {
+        ...(dateFrom ? { $gte: new Date(dateFrom) } : {}),
+        ...(dateTo
+          ? {
+              $lte: (() => {
+                const end = new Date(dateTo);
+                end.setHours(23, 59, 59, 999);
+                return end;
+              })(),
+            }
+          : {}),
+      };
+    }
+
+    const matchConditions: QueryFilter<AggregatedActivity> = {};
+
+    if (byUsers?.length) {
+      const validUserIds = byUsers
+        .filter((id) => Types.ObjectId.isValid(id))
+        .map((id) => new Types.ObjectId(id));
+
+      if (validUserIds.length) {
+        matchConditions['byUser._id'] = { $in: validUserIds };
+      }
+    }
+
+    if (search?.trim()) {
+      const regex = new RegExp(search.trim(), 'i');
+      matchConditions.$or = [
+        { 'byUser.name': regex },
+        { projectName: regex },
+        { action: regex },
+      ];
+    }
+
+    const basePipeline: PipelineStage[] = [
+      { $match: filter },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'byUser',
+          foreignField: '_id',
+          as: 'byUser',
+        },
+      },
+      {
+        $unwind: {
+          path: '$byUser',
+          preserveNullAndEmptyArrays: false,
+        },
+      },
+      ...(Object.keys(matchConditions).length
+        ? [{ $match: matchConditions } as PipelineStage]
+        : []),
+    ];
+
+    const $projectStage: PipelineStage = {
+      $project: {
+        action: 1,
+        projectName: 1,
+        updatedFields: 1,
+        createdAt: 1,
+        'byUser._id': 1,
+        'byUser.name': 1,
+        'byUser.profileImage': 1,
+      },
+    };
+
+    const pipeline: PipelineStage[] = [
+      ...basePipeline,
+      { $sort: { createdAt: -1 } },
+      $projectStage,
+    ];
+
+    const countPipeline: PipelineStage[] = [
+      ...basePipeline,
+      { $count: 'total' },
+    ];
+
+    return { pipeline, countPipeline };
+  }
+
+  async getProjectActivities(
+    projectId: string,
+    options: GetActivitiesDto,
+  ): Promise<PaginatedActivitiesResult> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      byUsers,
+      actions,
+      dateFrom,
+      dateTo,
+    } = options;
     const skip = (page - 1) * limit;
 
-    const [activities, total] = await Promise.all([
-      this.activityModel
-        .find({ project: new Types.ObjectId(projectId) })
-        .populate('byUser', 'name profileImage')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      this.activityModel.countDocuments({
-        project: new Types.ObjectId(projectId),
-      }),
+    const { pipeline, countPipeline } = this.buildActivityPipeline({
+      projectId,
+      search,
+      byUsers,
+      actions,
+      dateFrom,
+      dateTo,
+    });
+
+    // Inject skip/limit before $project (last stage)
+    const paginatedPipeline: PipelineStage[] = [
+      ...pipeline.slice(0, -1), // everything except $project
+      { $skip: skip },
+      { $limit: limit },
+      pipeline[pipeline.length - 1], // $project last
+    ];
+
+    const [activities, countResult] = await Promise.all([
+      this.activityModel.aggregate<AggregatedActivity>(paginatedPipeline),
+      this.activityModel.aggregate<CountResult>(countPipeline),
     ]);
 
-    return {
-      activities,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    };
+    const total = countResult[0]?.total ?? 0;
+
+    return { activities, total, page, totalPages: Math.ceil(total / limit) };
+  }
+
+  async exportProjectActivities(
+    projectId: string,
+    options: GetActivitiesDto,
+  ): Promise<{ activities: AggregatedActivity[] }> {
+    const { search, byUsers, actions, dateFrom, dateTo } = options;
+
+    const { pipeline } = this.buildActivityPipeline({
+      projectId,
+      search,
+      byUsers,
+      actions,
+      dateFrom,
+      dateTo,
+    });
+
+    const activities =
+      await this.activityModel.aggregate<AggregatedActivity>(pipeline);
+
+    return { activities };
   }
 }

@@ -54,7 +54,6 @@ export class ActivityController {
     return await this.activityService.getProjectActivities(projectId, body);
   }
 
-  // controller
   @Post('projects/:projectId/activities/export')
   async exportProjectActivities(
     @Param('projectId') projectId: string,
@@ -62,5 +61,10 @@ export class ActivityController {
   ) {
     console.log(body);
     return await this.activityService.exportProjectActivities(projectId, body);
+  }
+
+  @Get('projects/:projectId/analytics')
+  async getProjectAnalytics(@Param('projectId') projectId: string) {
+    return await this.activityService.getProjectAnalytics(projectId);
   }
 }

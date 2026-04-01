@@ -18,6 +18,7 @@ import {
   CountResult,
   PaginatedActivitiesResult,
 } from '../type/activity-filter.type';
+import { Task } from 'src/modules/tasks/entities/task.entity';
 
 interface BuildPipelineOptions {
   projectId: string;
@@ -33,12 +34,31 @@ interface BuiltPipeline {
   countPipeline: PipelineStage[];
 }
 
+interface SubtaskStatResult {
+  _id: {
+    epicId: Types.ObjectId;
+    status: string;
+  };
+  count: number;
+}
+interface EpicDocument {
+  _id: Types.ObjectId;
+  title: string;
+  key: string;
+  status: string;
+}
+
 @Injectable()
 export class ActivityService {
   constructor(
-    @InjectModel(Activity.name) private activityModel: Model<Activity>,
+    @InjectModel(Activity.name)
+    private activityModel: Model<Activity>,
+
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+
+    @InjectModel(Task.name)
+    private readonly taskModel: Model<Task>,
   ) {}
 
   private normalizeUpdatedValue(field: string, value: string): string {
@@ -482,5 +502,172 @@ export class ActivityService {
       await this.activityModel.aggregate<AggregatedActivity>(pipeline);
 
     return { activities };
+  }
+
+  async getProjectAnalytics(projectId: string) {
+    const id = new Types.ObjectId(projectId);
+
+    const [
+      statusOverview,
+      priorityBreakdown,
+      typesOfWork,
+      teamWorkload,
+      epicProgress,
+      recentActivity,
+    ] = await Promise.all([
+      this.getStatusOverview(id),
+      this.getPriorityBreakdown(id),
+      this.getTypesOfWork(id),
+      this.getTeamWorkload(id),
+      this.getEpicProgress(id),
+      this.getRecentActivity(id),
+    ]);
+
+    return {
+      statusOverview,
+      priorityBreakdown,
+      typesOfWork,
+      teamWorkload,
+      epicProgress,
+      recentActivity,
+    };
+  }
+
+  private async getStatusOverview(projectId: Types.ObjectId) {
+    return this.taskModel.aggregate([
+      { $match: { projectId, parentTask: null } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+      { $project: { status: '$_id', count: 1, _id: 0 } },
+    ]);
+  }
+
+  private async getPriorityBreakdown(projectId: Types.ObjectId) {
+    return this.taskModel.aggregate([
+      { $match: { projectId, parentTask: null } },
+      { $group: { _id: '$priority', count: { $sum: 1 } } },
+      { $project: { priority: '$_id', count: 1, _id: 0 } },
+      {
+        $sort: {
+          priority: 1,
+        },
+      },
+    ]);
+  }
+
+  private async getTypesOfWork(projectId: Types.ObjectId) {
+    return this.taskModel.aggregate([
+      { $match: { projectId, parentTask: null } },
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+      { $project: { type: '$_id', count: 1, _id: 0 } },
+      { $sort: { count: -1 } },
+    ]);
+  }
+
+  private async getTeamWorkload(projectId: Types.ObjectId) {
+    return this.taskModel.aggregate([
+      {
+        $match: {
+          projectId,
+          parentTask: null,
+          assignee: { $ne: null },
+          status: { $ne: 'done' },
+        },
+      },
+      { $group: { _id: '$assignee', count: { $sum: 1 } } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: '$user' },
+      {
+        $project: {
+          _id: 0,
+          userId: '$user._id',
+          name: '$user.name',
+          profileImage: '$user.profileImage',
+          count: 1,
+        },
+      },
+      { $sort: { count: -1 } },
+    ]);
+  }
+
+  private async getEpicProgress(projectId: Types.ObjectId) {
+    const epics = await this.taskModel
+      .find({ projectId, type: 'epic' })
+      .select('_id title key status')
+      .lean<EpicDocument[]>();
+
+    const epicIds = epics.map((e) => e._id);
+
+    const subtaskStats = await this.taskModel.aggregate<SubtaskStatResult>([
+      {
+        $match: {
+          projectId,
+          parentTask: { $in: epicIds },
+        },
+      },
+      {
+        $group: {
+          _id: { epicId: '$parentTask', status: '$status' },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    return epics.map((epic) => {
+      const stats = subtaskStats.filter(
+        (s) => s._id.epicId.toString() === epic._id.toString(),
+      );
+
+      const statusMap: Record<string, number> = {};
+      let total = 0;
+
+      for (const s of stats) {
+        statusMap[s._id.status] = s.count;
+        total += s.count;
+      }
+
+      return {
+        epicId: epic._id,
+        title: epic.title,
+        key: epic.key,
+        epicStatus: epic.status,
+        total,
+        breakdown: statusMap,
+      };
+    });
+  }
+
+  private async getRecentActivity(projectId: Types.ObjectId) {
+    return this.activityModel.aggregate([
+      { $match: { project: projectId } },
+      { $sort: { createdAt: -1 } },
+      { $limit: 20 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'byUser',
+          foreignField: '_id',
+          as: 'byUser',
+        },
+      },
+      { $unwind: '$byUser' },
+      {
+        $project: {
+          action: 1,
+          projectName: 1,
+          updatedFields: 1,
+          createdAt: 1,
+          'byUser._id': 1,
+          'byUser.name': 1,
+          'byUser.profileImage': 1,
+        },
+      },
+    ]);
   }
 }

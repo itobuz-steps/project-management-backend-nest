@@ -626,10 +626,14 @@ export class ActivityService {
 
       const statusMap: Record<string, number> = {};
       let total = 0;
+      let completed = 0;
 
       for (const s of stats) {
         statusMap[s._id.status] = s.count;
         total += s.count;
+        if (s._id.status === 'done') {
+          completed += s.count;
+        }
       }
 
       return {
@@ -638,6 +642,8 @@ export class ActivityService {
         key: epic.key,
         epicStatus: epic.status,
         total,
+        completed,
+        percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
         breakdown: statusMap,
       };
     });

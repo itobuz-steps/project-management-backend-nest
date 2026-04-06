@@ -58,127 +58,6 @@ export class CommentService {
       .populate('author', 'name profileImage');
   }
 
-  // async create(
-  //   userId: ObjectIdLike,
-  //   role: Role,
-  //   taskId: ObjectIdLike,
-  //   createCommentDto: CreateCommentDto,
-  //   file?: Express.Multer.File,
-  // ): Promise<Comment> {
-  //   const task = await this.checkMembership(userId, role, taskId);
-
-  //   if (!task) {
-  //     throw new NotFoundException('Task not found');
-  //   }
-
-  //   let attachment: string | null = null;
-
-  //   if (file) {
-  //     const uploadResult = await this.storageService.uploadSingleFile(file);
-  //     attachment = uploadResult.url;
-  //   }
-
-  //   const parsed = parseCommentContent(createCommentDto.message);
-
-  //   let parentId: Types.ObjectId | undefined;
-
-  //   if (createCommentDto.parentId) {
-  //     const parent = await this.commentModel.findById(
-  //       createCommentDto.parentId,
-  //     );
-
-  //     if (!parent) {
-  //       throw new BadRequestException('No Parent Comment Found');
-  //     }
-
-  //     if (parent.parentId) {
-  //       throw new BadRequestException("Cann't reply to replies");
-  //     }
-
-  //     parentId = parent._id;
-  //   }
-
-  //   const { parentId: _parentId, ...restDto } = createCommentDto;
-
-  //   const newComment = await this.commentModel.create({
-  //     ...restDto,
-  //     message: createCommentDto.message,
-  //     parsedText: parsed.text,
-  //     attachment,
-  //     taskId,
-  //     author: userId,
-  //     ...(parentId && { parentId }),
-  //   });
-
-  //   // Log comment added activity
-  //   await this.activityService.logCommentAdded({
-  //     taskId: taskId.toString(),
-  //     byUserId: userId.toString(),
-  //     commentText: createCommentDto.message,
-  //   });
-
-  //   // Notify assignee and reporter about new comment (excluding the commenter)
-  //   const usersToNotify = new Set<string>();
-  //   if (task.assignee && task.assignee.toString() !== userId.toString()) {
-  //     usersToNotify.add(task.assignee.toString());
-  //   }
-  //   if (task.reporter.toString() !== userId.toString()) {
-  //     usersToNotify.add(task.reporter.toString());
-  //   }
-
-  //   // Add mentions to notification
-  //   if (createCommentDto.mentions && createCommentDto.mentions.length) {
-  //     createCommentDto.mentions.forEach((mentionedUserId) => {
-  //       if (mentionedUserId !== userId.toString()) {
-  //         console.log(mentionedUserId);
-  //         usersToNotify.add(mentionedUserId);
-  //       }
-  //     });
-  //   }
-
-  //   void Promise.all(
-  //     Array.from(usersToNotify).map(async (notifyUserId) => {
-  //       try {
-  //         await this.notificationPushService.pushNotificationToUser(
-  //           notifyUserId,
-  //           {
-  //             title: `New Comment on "${task.title}"`,
-  //             message: `${userId.toString() === notifyUserId ? 'You were mentioned in a comment' : 'A new comment was added'}`,
-  //             projectId: task.projectId,
-  //             taskId: task._id,
-  //           },
-  //         );
-
-  //         const user = await this.userModel.findById(notifyUserId);
-
-  //         if (user?.notificationPreferences?.email && user.email) {
-  //           const project = await this.projectModel.findById(task.projectId);
-  //           const author = await this.userModel.findById(userId);
-
-  //           await this.mailService.sendTemplateMail(
-  //             user.email,
-  //             `New Comment on "${task.title}"`,
-  //             'comment',
-  //             {
-  //               taskKey: task.key,
-  //               taskTitle: task.title,
-  //               projectName: project?.name,
-  //               actorName: author?.name || 'Someone',
-  //               commentText: parsed.text,
-  //               isMention: createCommentDto.mentions?.includes(notifyUserId),
-  //               taskUrl: this.buildTaskUrl(task._id.toString()),
-  //             },
-  //           );
-  //         }
-  //       } catch (err) {
-  //         console.error('Notification error:', err);
-  //       }
-  //     }),
-  //   );
-
-  //   return newComment;
-  // }
-
   async create(
     userId: ObjectIdLike,
     role: Role,
@@ -203,7 +82,6 @@ export class CommentService {
 
     let parentId: Types.ObjectId | null = null;
 
-    // ✅ Handle replies
     if (createCommentDto.parentId) {
       const parent = await this.commentModel.findById(
         createCommentDto.parentId,
@@ -220,7 +98,6 @@ export class CommentService {
       parentId = parent._id;
     }
 
-    // ✅ Convert mentions to ObjectId[]
     const mentionIds: Types.ObjectId[] =
       createCommentDto.mentions?.map((id) => new Types.ObjectId(id)) || [];
 
@@ -234,14 +111,12 @@ export class CommentService {
       parentId,
     });
 
-    // ✅ Activity log
     await this.activityService.logCommentAdded({
       taskId: taskId.toString(),
       byUserId: userId.toString(),
       commentText: createCommentDto.message,
     });
 
-    // ✅ Notification logic
     const usersToNotify = new Set<string>();
 
     if (task.assignee && task.assignee.toString() !== userId.toString()) {
@@ -252,7 +127,6 @@ export class CommentService {
       usersToNotify.add(task.reporter.toString());
     }
 
-    // ✅ Add mentions
     createCommentDto.mentions?.forEach((id) => {
       if (id !== userId.toString()) {
         usersToNotify.add(id);

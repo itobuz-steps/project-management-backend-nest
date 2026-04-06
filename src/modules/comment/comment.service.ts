@@ -22,6 +22,23 @@ import { AppConfig } from 'src/config/app.config';
 import { ConfigService } from '@nestjs/config';
 import { parseCommentContent } from './parseCommentContent';
 
+export interface CommentDocument {
+  _id: Types.ObjectId;
+  taskId: Types.ObjectId;
+  author: { name: string; profileImage: string }; // populated shape
+  message: string;
+  parsedText?: string;
+  attachment: string | null;
+  mentions: Types.ObjectId[];
+  parentId: Types.ObjectId | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CommentWithReplies extends CommentDocument {
+  replies: CommentDocument[];
+}
+
 @Injectable()
 export class CommentService {
   constructor(
@@ -50,12 +67,35 @@ export class CommentService {
     userId: ObjectIdLike,
     role: Role,
     taskId: ObjectIdLike,
-  ): Promise<Comment[]> {
+  ): Promise<CommentWithReplies[]> {
     await this.checkMembership(userId, role, taskId);
 
-    return this.commentModel
+    const allComments = await this.commentModel
       .find({ taskId })
-      .populate('author', 'name profileImage');
+      .populate('author', 'name profileImage')
+      .lean<CommentDocument[]>();
+
+    const parentComments: CommentWithReplies[] = [];
+    const repliesMap = new Map<string, CommentDocument[]>();
+
+    for (const comment of allComments) {
+      if (comment.parentId) {
+        const parentId = comment.parentId.toString();
+        if (!repliesMap.has(parentId)) {
+          repliesMap.set(parentId, []);
+        }
+        repliesMap.get(parentId)!.push(comment);
+      } else {
+        parentComments.push({ ...comment, replies: [] });
+      }
+    }
+
+    for (const parent of parentComments) {
+      const parentId = parent._id.toString();
+      parent.replies = repliesMap.get(parentId) ?? [];
+    }
+
+    return parentComments;
   }
 
   async create(

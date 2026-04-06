@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, IsArray } from 'class-validator';
 
 export class CreateCommentDto {
   @ApiProperty({
@@ -10,10 +10,16 @@ export class CreateCommentDto {
   message: string;
 
   @ApiProperty({
-    description: 'Optional attachment filename',
-    example: 'screenshot.png',
+    description: 'Mentioned user IDs',
     required: false,
+    type: [String],
   })
   @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   mentions?: string[];
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
 }

@@ -1,10 +1,11 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { Comment } from './entities/comment.entity';
@@ -20,6 +21,7 @@ import { MailService } from 'src/mail/mail.service';
 import { AppConfig } from 'src/config/app.config';
 import { ConfigService } from '@nestjs/config';
 import { parseCommentContent } from './parseCommentContent';
+import { CommentDocument, CommentWithReplies } from './types/comment';
 
 @Injectable()
 export class CommentService {
@@ -49,12 +51,35 @@ export class CommentService {
     userId: ObjectIdLike,
     role: Role,
     taskId: ObjectIdLike,
-  ): Promise<Comment[]> {
+  ): Promise<CommentWithReplies[]> {
     await this.checkMembership(userId, role, taskId);
 
-    return this.commentModel
+    const allComments = await this.commentModel
       .find({ taskId })
-      .populate('author', 'name profileImage');
+      .populate('author', 'name profileImage')
+      .lean<CommentDocument[]>();
+
+    const parentComments: CommentWithReplies[] = [];
+    const repliesMap = new Map<string, CommentDocument[]>();
+
+    for (const comment of allComments) {
+      if (comment.parentId) {
+        const parentId = comment.parentId.toString();
+        if (!repliesMap.has(parentId)) {
+          repliesMap.set(parentId, []);
+        }
+        repliesMap.get(parentId)!.push(comment);
+      } else {
+        parentComments.push({ ...comment, replies: [] });
+      }
+    }
+
+    for (const parent of parentComments) {
+      const parentId = parent._id.toString();
+      parent.replies = repliesMap.get(parentId) ?? [];
+    }
+
+    return parentComments;
   }
 
   async create(
@@ -66,6 +91,10 @@ export class CommentService {
   ): Promise<Comment> {
     const task = await this.checkMembership(userId, role, taskId);
 
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
     let attachment: string | null = null;
 
     if (file) {
@@ -75,53 +104,71 @@ export class CommentService {
 
     const parsed = parseCommentContent(createCommentDto.message);
 
+    let parentId: Types.ObjectId | null = null;
+
+    if (createCommentDto.parentId) {
+      const parent = await this.commentModel.findById(
+        createCommentDto.parentId,
+      );
+
+      if (!parent) {
+        throw new BadRequestException('No Parent Comment Found');
+      }
+
+      if (parent.parentId) {
+        throw new BadRequestException("Can't reply to replies");
+      }
+
+      parentId = parent._id;
+    }
+
+    const mentionIds: Types.ObjectId[] =
+      createCommentDto.mentions?.map((id) => new Types.ObjectId(id)) || [];
+
     const newComment = await this.commentModel.create({
-      ...createCommentDto,
       message: createCommentDto.message,
       parsedText: parsed.text,
       attachment,
-      taskId,
-      author: userId,
+      taskId: new Types.ObjectId(taskId),
+      author: new Types.ObjectId(userId),
+      mentions: mentionIds,
+      parentId,
     });
 
-    if (!task) {
-      throw new NotFoundException('Task not found');
-    }
-
-    // Log comment added activity
     await this.activityService.logCommentAdded({
       taskId: taskId.toString(),
       byUserId: userId.toString(),
       commentText: createCommentDto.message,
     });
 
-    // Notify assignee and reporter about new comment (excluding the commenter)
     const usersToNotify = new Set<string>();
+
     if (task.assignee && task.assignee.toString() !== userId.toString()) {
       usersToNotify.add(task.assignee.toString());
     }
+
     if (task.reporter.toString() !== userId.toString()) {
       usersToNotify.add(task.reporter.toString());
     }
 
-    // Add mentions to notification
-    if (createCommentDto.mentions && createCommentDto.mentions.length) {
-      createCommentDto.mentions.forEach((mentionedUserId) => {
-        if (mentionedUserId !== userId.toString()) {
-          console.log(mentionedUserId);
-          usersToNotify.add(mentionedUserId);
-        }
-      });
-    }
+    createCommentDto.mentions?.forEach((id) => {
+      if (id !== userId.toString()) {
+        usersToNotify.add(id);
+      }
+    });
 
     void Promise.all(
       Array.from(usersToNotify).map(async (notifyUserId) => {
         try {
+          const isMention = createCommentDto.mentions?.includes(notifyUserId);
+
           await this.notificationPushService.pushNotificationToUser(
             notifyUserId,
             {
               title: `New Comment on "${task.title}"`,
-              message: `${userId.toString() === notifyUserId ? 'You were mentioned in a comment' : 'A new comment was added'}`,
+              message: isMention
+                ? 'You were mentioned in a comment'
+                : 'A new comment was added',
               projectId: task.projectId,
               taskId: task._id,
             },
@@ -143,7 +190,7 @@ export class CommentService {
                 projectName: project?.name,
                 actorName: author?.name || 'Someone',
                 commentText: parsed.text,
-                isMention: createCommentDto.mentions?.includes(notifyUserId),
+                isMention,
                 taskUrl: this.buildTaskUrl(task._id.toString()),
               },
             );

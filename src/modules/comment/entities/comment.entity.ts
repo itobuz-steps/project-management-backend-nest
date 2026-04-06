@@ -35,6 +35,13 @@ export class Comment extends Document {
 
   @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'User' }] })
   mentions: Types.ObjectId[];
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Comment',
+    default: null,
+  })
+  parentId: Types.ObjectId | null;
 }
 
 export const CommentSchema = SchemaFactory.createForClass(Comment);

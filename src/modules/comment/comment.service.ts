@@ -21,23 +21,7 @@ import { MailService } from 'src/mail/mail.service';
 import { AppConfig } from 'src/config/app.config';
 import { ConfigService } from '@nestjs/config';
 import { parseCommentContent } from './parseCommentContent';
-
-export interface CommentDocument {
-  _id: Types.ObjectId;
-  taskId: Types.ObjectId;
-  author: { name: string; profileImage: string }; // populated shape
-  message: string;
-  parsedText?: string;
-  attachment: string | null;
-  mentions: Types.ObjectId[];
-  parentId: Types.ObjectId | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface CommentWithReplies extends CommentDocument {
-  replies: CommentDocument[];
-}
+import { CommentDocument, CommentWithReplies } from './types/comment';
 
 @Injectable()
 export class CommentService {

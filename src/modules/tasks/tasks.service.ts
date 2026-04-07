@@ -965,6 +965,7 @@ export class TasksService {
     });
 
     // Stage 4: Lookup activity logs for each task (STATUS_CHANGED only, within last week)
+
     pipeline.push({
       $lookup: {
         from: 'activities',
@@ -976,15 +977,23 @@ export class TasksService {
                 $and: [
                   { $eq: ['$task', '$$taskId'] },
                   { $eq: ['$action', 'STATUS_CHANGED'] },
-                  { $gte: ['$createdAt', oneWeekAgo] },
-                  { $eq: ['$updatedFields.status.to', '$$doneStatus'] },
+                  {
+                    $gte: [
+                      '$createdAt',
+                      new Date(oneWeekAgo.setHours(0, 0, 0, 0)),
+                    ],
+                  },
+                  {
+                    $eq: [
+                      { $ifNull: ['$updatedFields.status.to', null] },
+                      '$$doneStatus',
+                    ],
+                  },
                 ],
               },
             },
           },
-          // Sort descending to get the latest status change first
           { $sort: { createdAt: -1 } },
-          // Take only the last (most recent) transition to done
           { $limit: 1 },
         ],
         as: 'doneActivities',

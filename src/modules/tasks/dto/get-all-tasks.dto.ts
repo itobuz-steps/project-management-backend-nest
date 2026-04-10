@@ -79,7 +79,6 @@ export class GetAllTasksDto {
   @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc';
 
-  // ✅ PRIORITY (MULTI)
   @ApiPropertyOptional({
     description: 'Priority filter (multi)',
     enum: TASK_PRIORITIES,
@@ -92,7 +91,6 @@ export class GetAllTasksDto {
   @IsEnum(TASK_PRIORITIES, { each: true })
   priority?: TaskPriority[];
 
-  // ✅ STATUS (MULTI)
   @ApiPropertyOptional({
     description: 'Status filter (multi)',
     example: ['todo', 'in-progress'],
@@ -104,7 +102,6 @@ export class GetAllTasksDto {
   @IsString({ each: true })
   status?: string[];
 
-  // ✅ TYPE (MULTI)
   @ApiPropertyOptional({
     description: 'Task type filter (multi)',
     enum: TASK_TYPES,
@@ -117,7 +114,6 @@ export class GetAllTasksDto {
   @IsEnum(TASK_TYPES, { each: true })
   type?: TaskType[];
 
-  // ✅ TAGS
   @ApiPropertyOptional({
     description: 'Tags filter',
     type: [String],
@@ -129,7 +125,6 @@ export class GetAllTasksDto {
   @IsString({ each: true })
   tags?: string[];
 
-  // ✅ ASSIGNEE (MULTI)
   @ApiPropertyOptional({
     description: 'Assignee user IDs (multi)',
     type: [String],
@@ -141,7 +136,6 @@ export class GetAllTasksDto {
   @IsMongoId({ each: true })
   assignee?: string[];
 
-  // ✅ REPORTER (MULTI)
   @ApiPropertyOptional({
     description: 'Reporter user IDs (multi)',
     type: [String],

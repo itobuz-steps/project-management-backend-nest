@@ -223,7 +223,6 @@ export class TasksService {
 
     const match: Record<string, unknown> = {};
 
-    // ✅ PROJECT ACCESS
     let projectIds: mongoose.Types.ObjectId[] = [];
 
     if (role === Role.SUPERADMIN) {
@@ -258,7 +257,6 @@ export class TasksService {
 
     match.projectId = { $in: projectIds };
 
-    // ✅ SEARCH
     if (filter.searchQuery) {
       match.$or = [
         { title: { $regex: filter.searchQuery, $options: 'i' } },
@@ -267,7 +265,6 @@ export class TasksService {
       ];
     }
 
-    // ✅ FILTERS
     if (filter.priority?.length) {
       match.priority = { $in: filter.priority };
     }
@@ -296,7 +293,6 @@ export class TasksService {
       };
     }
 
-    // ✅ SORT
     const sortStage: PipelineStage.Sort = {
       $sort: filter.sortBy
         ? { [filter.sortBy]: filter.sortOrder === 'asc' ? 1 : -1 }
@@ -308,8 +304,6 @@ export class TasksService {
       sortStage,
       { $skip: skip },
       { $limit: limit },
-
-      // ASSIGNEE
       {
         $lookup: {
           from: 'users',
@@ -320,8 +314,6 @@ export class TasksService {
         },
       },
       { $unwind: { path: '$assignee', preserveNullAndEmptyArrays: true } },
-
-      // REPORTER
       {
         $lookup: {
           from: 'users',

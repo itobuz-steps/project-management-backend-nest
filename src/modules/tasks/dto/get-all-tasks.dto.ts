@@ -24,6 +24,26 @@ const SORTABLE_FIELDS: (keyof Task | 'createdAt' | 'updatedAt')[] = [
   'updatedAt',
 ];
 
+const toArray = (value: unknown): string[] | undefined => {
+  if (!value) return undefined;
+
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((v) => (typeof v === 'string' ? v.split(',') : []))
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+  }
+
+  return undefined;
+};
+
 export class GetAllTasksDto {
   @ApiPropertyOptional({
     description: 'Project ID to filter tasks',
@@ -60,65 +80,72 @@ export class GetAllTasksDto {
   sortOrder?: 'asc' | 'desc';
 
   @ApiPropertyOptional({
-    description: 'Priority filter',
+    description: 'Priority filter (multi)',
     enum: TASK_PRIORITIES,
-    example: 'high',
+    isArray: true,
+    example: ['high', 'medium'],
   })
   @IsOptional()
-  @IsEnum(TASK_PRIORITIES)
-  priority?: TaskPriority;
+  @Transform(({ value }) => toArray(value))
+  @IsArray()
+  @IsEnum(TASK_PRIORITIES, { each: true })
+  priority?: TaskPriority[];
 
   @ApiPropertyOptional({
-    description: 'Status filter',
-    example: 'in-progress',
+    description: 'Status filter (multi)',
+    example: ['todo', 'in-progress'],
+    isArray: true,
   })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @Transform(({ value }) => toArray(value))
+  @IsArray()
+  @IsString({ each: true })
+  status?: string[];
 
   @ApiPropertyOptional({
-    description: 'Task type filter',
+    description: 'Task type filter (multi)',
     enum: TASK_TYPES,
-    example: 'task',
+    isArray: true,
+    example: ['task', 'bug'],
   })
   @IsOptional()
-  @IsEnum(TASK_TYPES)
-  type?: TaskType;
+  @Transform(({ value }) => toArray(value))
+  @IsArray()
+  @IsEnum(TASK_TYPES, { each: true })
+  type?: TaskType[];
 
   @ApiPropertyOptional({
-    description: 'Tags filter. Can be comma-separated or repeated query params',
-    example: 'frontend,authentication',
+    description: 'Tags filter',
     type: [String],
+    example: ['frontend', 'auth'],
   })
   @IsOptional()
-  @Transform(({ value }) => {
-    if (!value) {
-      return undefined;
-    }
-
-    if (Array.isArray(value)) {
-      return value
-        .flatMap((item) => `${item}`.split(','))
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-
-    return `${value}`
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean);
-  })
+  @Transform(({ value }) => toArray(value))
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
 
   @ApiPropertyOptional({
-    description: 'Assignee user ID',
-    example: '507f1f77bcf86cd799439011',
+    description: 'Assignee user IDs (multi)',
+    type: [String],
+    example: ['507f1f77bcf86cd799439011'],
   })
   @IsOptional()
-  @IsMongoId()
-  assignee?: string;
+  @Transform(({ value }) => toArray(value))
+  @IsArray()
+  @IsMongoId({ each: true })
+  assignee?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Reporter user IDs (multi)',
+    type: [String],
+    example: ['507f1f77bcf86cd799439012'],
+  })
+  @IsOptional()
+  @Transform(({ value }) => toArray(value))
+  @IsArray()
+  @IsMongoId({ each: true })
+  reporter?: string[];
 
   @ApiPropertyOptional({
     description: 'Page number (1-indexed)',
@@ -133,7 +160,7 @@ export class GetAllTasksDto {
   @ApiPropertyOptional({
     description: 'Items per page',
     example: 10,
-    default: 100,
+    default: 10,
   })
   @IsOptional()
   @Type(() => Number)

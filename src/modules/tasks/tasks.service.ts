@@ -8,7 +8,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { GetAllTasksDto } from './dto/get-all-tasks.dto';
 import { Types } from 'mongoose';
-import mongoose, { HydratedDocument, Model, PipelineStage } from 'mongoose';
+import mongoose, { Model, PipelineStage } from 'mongoose';
 import { Task } from './entities/task.entity';
 import { InjectModel } from '@nestjs/mongoose';
 import { Project } from '../project/schema/project.schema';
@@ -217,25 +217,20 @@ export class TasksService {
   }
 
   async findAll(userId: ObjectIdLike, role: Role, filter: GetAllTasksDto = {}) {
-    const page = Number(filter.page || 0);
-    const limit = Number(filter.limit || 100);
+    const page = Number(filter.page || 1);
+    const limit = Number(filter.limit || 10);
     const skip = (page - 1) * limit;
 
-    const matchPipeline: PipelineStage[] = [];
+    const match: Record<string, unknown> = {};
+
+    let projectIds: mongoose.Types.ObjectId[] = [];
 
     if (role === Role.SUPERADMIN) {
       if (filter.projectId) {
-        matchPipeline.push({
-          $match: {
-            projectId: new mongoose.Types.ObjectId(filter.projectId),
-          },
-        });
+        projectIds = [new mongoose.Types.ObjectId(filter.projectId)];
       } else {
-        const projectIds = await this.projectModel.find({}, { _id: 1 });
-
-        matchPipeline.push({
-          $match: { projectId: { $in: projectIds.map((p) => p._id) } },
-        });
+        const projects = await this.projectModel.find({}, { _id: 1 });
+        projectIds = projects.map((p) => p._id);
       }
     } else {
       if (filter.projectId) {
@@ -250,261 +245,100 @@ export class TasksService {
           );
         }
 
-        matchPipeline.push({
-          $match: {
-            projectId: new mongoose.Types.ObjectId(filter.projectId),
-          },
-        });
+        projectIds = [new mongoose.Types.ObjectId(filter.projectId)];
       } else {
-        const projectIds = await this.projectModel.find(
+        const projects = await this.projectModel.find(
           { 'members.user': userId },
           { _id: 1 },
         );
-        matchPipeline.push({
-          $match: { projectId: { $in: projectIds.map((p) => p._id) } },
-        });
+        projectIds = projects.map((p) => p._id);
       }
     }
 
+    match.projectId = { $in: projectIds };
+
     if (filter.searchQuery) {
-      matchPipeline.push({
-        $match: {
-          $or: [
-            { title: { $regex: filter.searchQuery, $options: 'i' } },
-            { description: { $regex: filter.searchQuery, $options: 'i' } },
-            { key: { $regex: filter.searchQuery, $options: 'i' } },
-          ],
-        },
-      });
+      match.$or = [
+        { title: { $regex: filter.searchQuery, $options: 'i' } },
+        { description: { $regex: filter.searchQuery, $options: 'i' } },
+        { key: { $regex: filter.searchQuery, $options: 'i' } },
+      ];
     }
 
-    if (filter.priority) {
-      matchPipeline.push({
-        $match: {
-          priority: filter.priority,
-        },
-      });
+    if (filter.priority?.length) {
+      match.priority = { $in: filter.priority };
     }
 
-    if (filter.status) {
-      matchPipeline.push({
-        $match: {
-          status: filter.status,
-        },
-      });
+    if (filter.status?.length) {
+      match.status = { $in: filter.status };
     }
 
-    if (filter.type) {
-      matchPipeline.push({
-        $match: {
-          type: filter.type,
-        },
-      });
+    if (filter.type?.length) {
+      match.type = { $in: filter.type };
     }
 
-    if (filter.tags instanceof Array && filter.tags.length) {
-      matchPipeline.push({
-        $match: {
-          tags: { $in: filter.tags },
-        },
-      });
+    if (filter.tags?.length) {
+      match.tags = { $in: filter.tags };
     }
 
-    if (filter.assignee) {
-      matchPipeline.push({
-        $match: {
-          assignee: new mongoose.Types.ObjectId(filter.assignee),
-        },
-      });
+    if (filter.assignee?.length) {
+      match.assignee = {
+        $in: filter.assignee.map((id) => new mongoose.Types.ObjectId(id)),
+      };
     }
 
-    const sortStage: PipelineStage = filter.sortBy
-      ? {
-          $sort: {
-            [filter.sortBy]: filter.sortOrder === 'asc' ? 1 : -1,
-          },
-        }
-      : {
-          $sort: {
-            createdAt: -1,
-          },
-        };
+    if (filter.reporter?.length) {
+      match.reporter = {
+        $in: filter.reporter.map((id) => new mongoose.Types.ObjectId(id)),
+      };
+    }
 
-    const paginationStages: PipelineStage[] = [
+    const sortStage: PipelineStage.Sort = {
+      $sort: filter.sortBy
+        ? { [filter.sortBy]: filter.sortOrder === 'asc' ? 1 : -1 }
+        : { createdAt: -1 },
+    };
+
+    const pipeline: PipelineStage[] = [
+      { $match: match },
+      sortStage,
+      { $skip: skip },
+      { $limit: limit },
       {
-        $skip: skip,
+        $lookup: {
+          from: 'users',
+          localField: 'assignee',
+          foreignField: '_id',
+          as: 'assignee',
+          pipeline: [{ $project: { name: 1, email: 1, profileImage: 1 } }],
+        },
       },
+      { $unwind: { path: '$assignee', preserveNullAndEmptyArrays: true } },
       {
-        $limit: limit,
+        $lookup: {
+          from: 'users',
+          localField: 'reporter',
+          foreignField: '_id',
+          as: 'reporter',
+          pipeline: [{ $project: { name: 1, email: 1, profileImage: 1 } }],
+        },
       },
+      { $unwind: { path: '$reporter', preserveNullAndEmptyArrays: true } },
     ];
 
-    const populateStages: PipelineStage[] = [];
-
-    // Populate assignee
-    populateStages.push({
-      $lookup: {
-        from: 'users',
-        localField: 'assignee',
-        foreignField: '_id',
-        as: 'assignee',
-        pipeline: [
-          {
-            $project: {
-              name: 1,
-              email: 1,
-              profileImage: 1,
-            },
-          },
-        ],
-      },
-    });
-
-    populateStages.push({
-      $unwind: {
-        path: '$assignee',
-        preserveNullAndEmptyArrays: true,
-      },
-    });
-
-    populateStages.push({
-      $lookup: {
-        from: 'projects',
-        localField: 'projectId',
-        foreignField: '_id',
-        as: 'projectId',
-      },
-    });
-
-    populateStages.push({
-      $unwind: {
-        path: '$projectId',
-        preserveNullAndEmptyArrays: true,
-      },
-    });
-
-    // Populate reporter
-    populateStages.push({
-      $lookup: {
-        from: 'users',
-        localField: 'reporter',
-        foreignField: '_id',
-        as: 'reporter',
-        pipeline: [
-          {
-            $project: {
-              name: 1,
-              email: 1,
-              profileImage: 1,
-            },
-          },
-        ],
-      },
-    });
-
-    populateStages.push({
-      $unwind: {
-        path: '$reporter',
-        preserveNullAndEmptyArrays: true,
-      },
-    });
-
-    // Populate related task references
-    populateStages.push(
-      {
-        $lookup: {
-          from: 'tasks',
-          localField: 'relatesTo',
-          foreignField: '_id',
-          as: 'relatesTo',
-          pipeline: [
-            {
-              $project: {
-                title: 1,
-                key: 1,
-                status: 1,
-                type: 1,
-              },
-            },
-          ],
-        },
-      },
-      {
-        $lookup: {
-          from: 'tasks',
-          localField: 'blocks',
-          foreignField: '_id',
-          as: 'blocks',
-          pipeline: [
-            {
-              $project: {
-                title: 1,
-                key: 1,
-                status: 1,
-                type: 1,
-              },
-            },
-          ],
-        },
-      },
-      {
-        $lookup: {
-          from: 'tasks',
-          localField: 'blockedBy',
-          foreignField: '_id',
-          as: 'blockedBy',
-          pipeline: [
-            {
-              $project: {
-                title: 1,
-                key: 1,
-                status: 1,
-                type: 1,
-              },
-            },
-          ],
-        },
-      },
-      {
-        $lookup: {
-          from: 'tasks',
-          localField: 'duplicates',
-          foreignField: '_id',
-          as: 'duplicates',
-          pipeline: [
-            {
-              $project: {
-                title: 1,
-                key: 1,
-                status: 1,
-                type: 1,
-              },
-            },
-          ],
-        },
-      },
-    );
-
-    const [result, totalCountResult] = await Promise.all([
-      this.taskModel.aggregate<HydratedDocument<Task>>([
-        ...matchPipeline,
-        sortStage,
-        ...paginationStages,
-        ...populateStages,
-      ]),
+    const [data, totalResult] = await Promise.all([
+      this.taskModel.aggregate(pipeline),
       this.taskModel.aggregate<{ total: number }>([
-        ...matchPipeline,
-        {
-          $count: 'total',
-        },
+        { $match: match },
+        { $count: 'total' },
       ]),
     ]);
 
-    const total = totalCountResult[0]?.total ?? 0;
-    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+    const total = totalResult[0]?.total ?? 0;
+    const totalPages = total ? Math.ceil(total / limit) : 0;
 
     return {
-      data: result,
+      data,
       pagination: {
         page,
         limit,

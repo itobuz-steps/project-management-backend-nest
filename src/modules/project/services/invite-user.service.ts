@@ -3,7 +3,6 @@ import {
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
-  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -18,6 +17,7 @@ import { InviteUserDto } from './../dto/invite-user.dto';
 import { Project } from './../schema/project.schema';
 import { ProjectRole, InvitePayload } from './../type/project.types';
 import { ObjectIdLike } from 'src/type/common.type';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class InviteUserService {
@@ -124,21 +124,26 @@ export class InviteUserService {
       );
     }
 
-    const project = await this.projectModel.findById(projectId);
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-
-    const memberExists = project.members.some(
-      (member) => String(member.user) === String(user._id),
+    const updateResult = await this.projectModel.updateOne(
+      {
+        _id: projectId,
+        'members.user': { $ne: user._id },
+      },
+      {
+        $push: {
+          members: {
+            user: user._id,
+            role: ProjectRole.MEMBER,
+          },
+        },
+      },
     );
 
-    if (!memberExists) {
-      project.members.push({
-        user: user._id,
-        role: ProjectRole.MEMBER,
-      });
-      await project.save();
+    if (updateResult.matchedCount === 0) {
+      const projectExists = await this.projectModel.exists({ _id: projectId });
+      if (!projectExists) {
+        throw new NotFoundException('Project not found');
+      }
     }
 
     return {

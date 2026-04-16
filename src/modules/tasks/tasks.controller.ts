@@ -139,6 +139,19 @@ export class TasksController {
     return { success: true, result };
   }
 
+  @Get(':taskId/total-time-tracked')
+  async getTotalTimeTracked(
+    @Param('taskId') taskId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const result = await this.tasksService.getTotalTimeTracked(
+      req.user._id,
+      req.user.role,
+      taskId,
+    );
+    return { success: true, result };
+  }
+
   @Patch('stop-timer/:worklogId')
   async stopTimer(
     @Param('worklogId') worklogId: string,

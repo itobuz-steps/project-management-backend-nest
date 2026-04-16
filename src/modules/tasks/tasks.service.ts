@@ -1068,7 +1068,6 @@ export class TasksService {
 
     return worklog;
   }
-
   async getWorklogsForTask(userId: ObjectIdLike, role: Role, taskId: string) {
     const task = await this.taskModel.findById(taskId);
 
@@ -1083,5 +1082,64 @@ export class TasksService {
       .populate('userId', 'name email profileImage');
 
     return worklogs;
+  }
+
+  async getTotalTimeTracked(userId: ObjectIdLike, role: Role, taskId: string) {
+    const task = await this.taskModel.findById(taskId);
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    await this.checkMembership(userId, role, task.projectId);
+
+    const [summary] = await this.worklogModel.aggregate<{
+      _id: mongoose.Types.ObjectId;
+      totalTrackedMs: number;
+      totalEntries: number;
+      completedEntries: number;
+    }>([
+      {
+        $match: {
+          taskId: task._id,
+        },
+      },
+      {
+        $project: {
+          durationMs: {
+            $max: [
+              {
+                $subtract: [{ $ifNull: ['$endTime', '$$NOW'] }, '$startTime'],
+              },
+              0,
+            ],
+          },
+          isCompleted: { $ne: ['$endTime', null] },
+        },
+      },
+      {
+        $group: {
+          _id: '$taskId',
+          totalTrackedMs: { $sum: '$durationMs' },
+          totalEntries: { $sum: 1 },
+          completedEntries: {
+            $sum: {
+              $cond: ['$isCompleted', 1, 0],
+            },
+          },
+        },
+      },
+    ]);
+
+    const totalTrackedMs = summary?.totalTrackedMs ?? 0;
+
+    return {
+      taskId: task._id,
+      totalTrackedMs,
+      totalTrackedSeconds: Math.floor(totalTrackedMs / 1000),
+      totalTrackedMinutes: Math.floor(totalTrackedMs / 60000),
+      totalEntries: summary?.totalEntries ?? 0,
+      completedEntries: summary?.completedEntries ?? 0,
+    };
   }
 }

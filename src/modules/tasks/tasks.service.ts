@@ -30,8 +30,6 @@ import { AppConfig } from 'src/config/app.config';
 import { plainToInstance } from 'class-transformer';
 import { isEmail, validate, ValidationError } from 'class-validator';
 import {
-  CSV_ARRAY_FIELDS,
-  CSV_IMPORT_FIELD_MAP,
   getTaskSchemaDefaultsForImport,
   ImportSchemaWithPath,
   isCsvNullishValue,
@@ -41,6 +39,10 @@ import {
   parseCsvFile,
   splitCsvArrayValue,
 } from './utils/task-import.utils';
+import {
+  CSV_ARRAY_FIELDS,
+  CSV_IMPORT_FIELD_MAP,
+} from './utils/import-constant';
 
 @Injectable()
 export class TasksService {

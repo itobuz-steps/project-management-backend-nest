@@ -35,3 +35,37 @@ export const multerOptionsForSingleFile = {
 export const multerOptionsForMultipleFiles = {
   ...multerConfig,
 };
+
+const CSV_FILE_MIME_TYPES = [
+  'text/csv',
+  'application/csv',
+  'application/vnd.ms-excel',
+  'text/plain',
+];
+
+export const multerOptionsForCsvFile = {
+  storage: memoryStorage(),
+  fileFilter: (
+    req: Express.Request,
+    file: Express.Multer.File,
+    callback: (error: Error | null, acceptFile: boolean) => void,
+  ) => {
+    const hasCsvMimeType = CSV_FILE_MIME_TYPES.includes(file.mimetype);
+    const hasCsvExtension = file.originalname.toLowerCase().endsWith('.csv');
+
+    if (hasCsvMimeType || hasCsvExtension) {
+      callback(null, true);
+      return;
+    }
+
+    callback(
+      new BadRequestException(
+        `Invalid import file type ${file.mimetype}. Please upload a CSV file.`,
+      ),
+      false,
+    );
+  },
+  limits: {
+    fileSize: MAX_ATTACHMENT_FILE_SIZE,
+  },
+};

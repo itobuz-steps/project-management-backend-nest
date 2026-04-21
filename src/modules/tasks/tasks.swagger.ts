@@ -113,6 +113,71 @@ export function CreateTaskDocs() {
   );
 }
 
+export function ImportTasksDocs() {
+  return applyDecorators(
+    ApiConsumes('multipart/form-data'),
+    ApiOperation({
+      summary: 'Import tasks from CSV',
+      description:
+        'Imports tasks into a specific project from a CSV file. The CSV headers must match task fields (for example: title, type, status, priority, tags, dueDate, assignee, storyPoint).',
+    }),
+    ApiParam({
+      name: 'projectId',
+      description: 'Project ID where tasks should be imported',
+      example: '507f1f77bcf86cd799439011',
+    }),
+    ApiBody({
+      schema: {
+        type: 'object',
+        properties: {
+          file: {
+            type: 'string',
+            format: 'binary',
+            description: 'CSV file containing task rows',
+          },
+        },
+        required: ['file'],
+      },
+    }),
+    ApiResponse({
+      status: 201,
+      description: 'Tasks imported successfully',
+      schema: {
+        type: 'object',
+        properties: {
+          success: { type: 'boolean', example: true },
+          result: {
+            type: 'object',
+            properties: {
+              totalRows: { type: 'number', example: 12 },
+              importedCount: { type: 'number', example: 12 },
+              projectId: {
+                type: 'string',
+                example: '507f1f77bcf86cd799439011',
+              },
+            },
+          },
+        },
+      },
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Bad request - invalid CSV format or row validation errors',
+      schema: ErrorResponse,
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized - authentication required',
+      schema: ErrorResponse,
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Project not found',
+      schema: ErrorResponse,
+    }),
+  );
+}
+
 export function GetAllTasksDocs() {
   return applyDecorators(
     ApiOperation({

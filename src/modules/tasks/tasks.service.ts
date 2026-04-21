@@ -27,6 +27,20 @@ import { MailService } from 'src/mail/mail.service';
 import { Worklog } from './entities/worklog.entity';
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from 'src/config/app.config';
+import { plainToInstance } from 'class-transformer';
+import { isEmail, validate, ValidationError } from 'class-validator';
+import {
+  CSV_ARRAY_FIELDS,
+  CSV_IMPORT_FIELD_MAP,
+  getTaskSchemaDefaultsForImport,
+  ImportSchemaWithPath,
+  isCsvNullishValue,
+  normalizeCsvEnumValue,
+  normalizeCsvHeader,
+  normalizeCsvStatusValue,
+  parseCsvFile,
+  splitCsvArrayValue,
+} from './utils/task-import.utils';
 
 @Injectable()
 export class TasksService {
@@ -130,6 +144,270 @@ export class TasksService {
         );
       }
     }
+  }
+
+  private extractValidationMessages(errors: ValidationError[]): string[] {
+    const messages: string[] = [];
+
+    for (const error of errors) {
+      if (error.constraints) {
+        messages.push(...Object.values(error.constraints));
+      }
+
+      if (error.children?.length) {
+        messages.push(...this.extractValidationMessages(error.children));
+      }
+    }
+
+    return messages;
+  }
+
+  async importTasksFromCsv(
+    userId: ObjectIdLike,
+    role: Role,
+    projectId: string,
+    file?: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('CSV file is required');
+    }
+
+    if (!file.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('Uploaded CSV file is empty');
+    }
+
+    const project = await this.checkMembership(userId, role, projectId);
+    const parsedRows = parseCsvFile(file.buffer);
+
+    if (parsedRows.length < 2) {
+      throw new BadRequestException(
+        'CSV must include a header row and at least one data row',
+      );
+    }
+
+    const rawHeaders = parsedRows[0];
+    const normalizedHeaders = rawHeaders.map((header) =>
+      normalizeCsvHeader(header),
+    );
+
+    if (normalizedHeaders.some((header) => !header)) {
+      throw new BadRequestException('CSV header contains empty column name');
+    }
+
+    const duplicateHeaders = normalizedHeaders.filter(
+      (header, index) => normalizedHeaders.indexOf(header) !== index,
+    );
+
+    if (duplicateHeaders.length) {
+      throw new BadRequestException(
+        `CSV has duplicate headers: ${Array.from(new Set(duplicateHeaders)).join(', ')}`,
+      );
+    }
+
+    const unknownHeaders = normalizedHeaders.filter(
+      (header) => !CSV_IMPORT_FIELD_MAP[header],
+    );
+
+    if (unknownHeaders.length) {
+      throw new BadRequestException(
+        `Unsupported CSV headers: ${unknownHeaders.join(', ')}`,
+      );
+    }
+
+    const dataRows = parsedRows
+      .slice(1)
+      .filter((row) => row.some((cell) => cell.trim().length > 0));
+
+    if (!dataRows.length) {
+      throw new BadRequestException('CSV file has no task rows to import');
+    }
+
+    const rowErrors: string[] = [];
+    const validatedTasks: Record<string, unknown>[] = [];
+    const importSchema = this.taskModel
+      .schema as unknown as ImportSchemaWithPath;
+    const taskSchemaDefaults = getTaskSchemaDefaultsForImport(importSchema);
+    const projectMemberIds = new Set(
+      project.members.map((member) => member.user.toString()),
+    );
+    const availableStatuses = new Set(project.columns.map((status) => status));
+    const projectMemberUsers = await this.userModel
+      .find({ _id: { $in: Array.from(projectMemberIds) } })
+      .select('_id email name')
+      .lean();
+
+    const projectMemberEmailToId = new Map<string, string>();
+
+    for (const member of projectMemberUsers) {
+      const memberId = member._id.toString();
+
+      if (typeof member.email === 'string' && member.email.trim()) {
+        projectMemberEmailToId.set(member.email.trim().toLowerCase(), memberId);
+      }
+    }
+
+    const defaultStatus = project.columns[0] ?? 'todo';
+
+    for (const [index, row] of dataRows.entries()) {
+      const rowNumber = index + 2;
+
+      if (row.length !== normalizedHeaders.length) {
+        rowErrors.push(
+          `Row ${rowNumber}: column count mismatch. Expected ${normalizedHeaders.length} columns but got ${row.length}.`,
+        );
+        continue;
+      }
+
+      const taskData: Record<string, unknown> = {
+        projectId,
+        type: 'task',
+        status: defaultStatus,
+      };
+      const rowValidationMessages: string[] = [];
+
+      for (
+        let columnIndex = 0;
+        columnIndex < normalizedHeaders.length;
+        columnIndex++
+      ) {
+        const rawValue = row[columnIndex]?.trim();
+
+        if (!rawValue || isCsvNullishValue(rawValue)) {
+          continue;
+        }
+
+        const normalizedHeader = normalizedHeaders[columnIndex];
+        const fieldName = CSV_IMPORT_FIELD_MAP[normalizedHeader];
+
+        if (!fieldName) {
+          continue;
+        }
+
+        switch (fieldName) {
+          case 'projectId': {
+            if (rawValue !== projectId) {
+              rowErrors.push(
+                `Row ${rowNumber}: projectId mismatch. Expected ${projectId} but got ${rawValue}.`,
+              );
+            }
+            break;
+          }
+          case 'type':
+          case 'priority': {
+            taskData[fieldName] = normalizeCsvEnumValue(rawValue);
+            break;
+          }
+          case 'status': {
+            taskData[fieldName] = normalizeCsvStatusValue(
+              rawValue,
+              availableStatuses,
+            );
+            break;
+          }
+          case 'assignee': {
+            const assigneeEmail = rawValue.trim().toLowerCase();
+
+            if (!isEmail(assigneeEmail)) {
+              rowValidationMessages.push(
+                'assignee must be a valid email address',
+              );
+              break;
+            }
+
+            const resolvedAssigneeId =
+              projectMemberEmailToId.get(assigneeEmail);
+
+            if (!resolvedAssigneeId) {
+              rowValidationMessages.push(
+                `assignee email does not belong to a member in this project: ${rawValue}`,
+              );
+              break;
+            }
+
+            taskData.assignee = resolvedAssigneeId;
+            break;
+          }
+          default: {
+            if (CSV_ARRAY_FIELDS.has(fieldName)) {
+              taskData[fieldName] = splitCsvArrayValue(rawValue);
+              break;
+            }
+
+            taskData[fieldName] = rawValue;
+            break;
+          }
+        }
+      }
+
+      const validationTarget = plainToInstance(CreateTaskDto, taskData);
+      const validationErrors = await validate(validationTarget, {
+        whitelist: true,
+      });
+
+      const validationMessages = [
+        ...this.extractValidationMessages(validationErrors),
+        ...rowValidationMessages,
+      ];
+
+      const status =
+        typeof taskData.status === 'string' ? taskData.status.trim() : '';
+
+      if (status && !availableStatuses.has(status)) {
+        validationMessages.push(
+          `status must be one of the project columns: ${project.columns.join(', ')}`,
+        );
+      }
+
+      if (validationMessages.length) {
+        rowErrors.push(`Row ${rowNumber}: ${validationMessages.join('; ')}`);
+        continue;
+      }
+
+      validatedTasks.push(taskData);
+    }
+
+    if (rowErrors.length) {
+      throw new BadRequestException({
+        message: 'CSV validation failed',
+        errors: rowErrors,
+      });
+    }
+
+    const projectPrefix = project.prefix || 'TASK';
+    const reporterId = new mongoose.Types.ObjectId(userId.toString());
+    const projectObjectId = new mongoose.Types.ObjectId(projectId);
+
+    const taskPayload = validatedTasks.map((task, index) => {
+      const rowTaskData: Record<string, unknown> = {
+        ...taskSchemaDefaults,
+        ...task,
+        projectId: projectObjectId,
+        reporter: reporterId,
+        key: `${projectPrefix}-${project.lastKey + index + 1}`,
+      };
+
+      if (typeof rowTaskData.storyPoint === 'string') {
+        const numericStoryPoint = Number(rowTaskData.storyPoint);
+
+        if (!Number.isNaN(numericStoryPoint)) {
+          rowTaskData.storyPoint = numericStoryPoint;
+        }
+      }
+
+      return rowTaskData;
+    });
+
+    const createdTasks = await this.taskModel.insertMany(taskPayload);
+
+    project.lastKey += createdTasks.length;
+    await project.save();
+
+    return {
+      projectId,
+      totalRows: dataRows.length,
+      importedCount: createdTasks.length,
+      keys: createdTasks.map((task) => task.key),
+    };
   }
 
   async create(

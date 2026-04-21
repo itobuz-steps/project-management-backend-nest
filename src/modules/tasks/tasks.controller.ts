@@ -10,9 +10,10 @@ import {
   UseGuards,
   Query,
   UseInterceptors,
+  UploadedFile,
   UploadedFiles,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -27,8 +28,12 @@ import {
   UpdateTaskDocs,
   DeleteTaskDocs,
   GetTaskStatsDocs,
+  ImportTasksDocs,
 } from './tasks.swagger';
-import { multerOptionsForMultipleFiles } from 'src/config/multer.config';
+import {
+  multerOptionsForCsvFile,
+  multerOptionsForMultipleFiles,
+} from 'src/config/multer.config';
 
 @UseGuards(IsAuthenticated)
 @ApiTags('tasks')
@@ -54,6 +59,25 @@ export class TasksController {
       createTaskDto,
       files,
     );
+    return { success: true, result };
+  }
+
+  @Post('import/:projectId')
+  @ImportTasksDocs()
+  @UseInterceptors(FileInterceptor('file', multerOptionsForCsvFile))
+  @ApiConsumes('multipart/form-data')
+  async importTasksFromCsv(
+    @Param('projectId') projectId: string,
+    @Req() req: AuthenticatedRequest,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    const result = await this.tasksService.importTasksFromCsv(
+      req.user._id,
+      req.user.role,
+      projectId,
+      file,
+    );
+
     return { success: true, result };
   }
 

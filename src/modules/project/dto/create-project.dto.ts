@@ -40,6 +40,10 @@ export class CreateProjectDto {
   iconKey?: string;
 
   @IsOptional()
+  @IsString()
+  theme?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProjectMemberDto)

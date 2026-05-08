@@ -85,9 +85,7 @@ export class StorageService {
         Key: key,
       });
 
-      const url = await getSignedUrl(this.client, command, {
-        expiresIn: 60 * 60 * 72, // 72 hours
-      });
+      const url = await getSignedUrl(this.client, command);
 
       return url;
     } catch (error) {

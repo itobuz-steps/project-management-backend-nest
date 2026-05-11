@@ -60,4 +60,14 @@ export class NotificationController {
       message: 'Notification Deleted successfully',
     };
   }
+
+  @Post('mark-all-as-read')
+  async markAllAsRead(@Req() req: AuthenticatedRequest) {
+    await this.notificationService.markAllAsRead(req.user._id);
+
+    return {
+      success: true,
+      message: 'All notifications marked as read',
+    };
+  }
 }

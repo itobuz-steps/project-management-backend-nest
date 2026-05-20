@@ -92,4 +92,21 @@ export class NotificationService {
       throw new NotFoundException('Notification not found');
     }
   }
+
+  async markAllAsRead(userId: ObjectIdLike): Promise<void> {
+    const userProjects = await this.projectModel.find(
+      { 'members.user': userId },
+      { _id: 1 },
+    );
+
+    const projectIds = userProjects.map((project) => project._id);
+
+    await this.notificationModel.updateMany(
+      {
+        $or: [{ userId }, { projectId: { $in: projectIds } }],
+        unread: true,
+      },
+      { $set: { unread: false } },
+    );
+  }
 }
